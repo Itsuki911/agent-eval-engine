@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-eval.example/schemas/fixture-manifest.schema.json",
+  "title": "Agent Evaluation Fixture Manifest",
+  "type": "object",
+  "required": ["schema_version", "id", "family", "reset"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*-v[0-9]+$" },
+    "family": { "type": "string", "enum": ["generic", "coding", "terminal", "web", "gui"] },
+    "reset": { "type": "object", "required": ["strategy"], "properties": { "strategy": { "type": "string", "enum": ["copy", "container", "vm_snapshot", "script"] }, "command": { "type": "string" } } },
+    "environment": { "type": "object" },
+    "tools": { "type": "array", "items": { "type": "object" } },
+    "verification": { "type": "object" },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}

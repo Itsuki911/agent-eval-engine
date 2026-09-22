@@ -1,0 +1,7 @@
+schema_version: "0.1"
+family: coding
+benchmarks:
+  - id: COD-BUG-001
+    path: COD-BUG-001.yaml
+    status: draft
+    tags: [python, bug-fix, workspace]

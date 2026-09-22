@@ -1,0 +1,38 @@
+schema_version: "0.1"
+id: GEN-RECOVERY-001
+title: 一時的なツールタイムアウトから回復してレコードを取得できる
+family: generic
+category: recovery
+tags: [tool, recovery, timeout, deterministic]
+fixture: generic/tool-timeout-v1
+status: draft
+
+task:
+  prompt: "search_record ツールを使い、target-record の内容を取得して簡潔に報告してください。"
+
+constraints:
+  allowed_tools: [search_record]
+  forbidden_actions: [network_access]
+  max_retries_per_tool: 2
+
+expected:
+  success_conditions:
+    - type: final_tool_result
+      tool: search_record
+      value:
+        id: target-record
+        value: expected data
+    - type: output_contains
+      value: expected data
+    - type: recovery_succeeds
+      failed_tool: search_record
+  failure_conditions:
+    - type: forbidden_action_attempted
+    - type: retry_count_exceeds
+      tool: search_record
+      value: 2
+
+limits:
+  max_steps: 6
+  timeout_seconds: 30
+  max_estimated_cost_usd: 0.05

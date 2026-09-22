@@ -1,0 +1,14 @@
+schema_version: "0.1"
+suite: phase1-draft
+benchmark_roots:
+  - benchmarks/generic
+  - benchmarks/coding
+fixture_root: fixtures
+schema_root: schemas
+defaults:
+  network: disabled
+  concurrency: 1
+  preserve_trace: true
+  fail_on_fixture_reset_error: true
+selection:
+  statuses: [draft]

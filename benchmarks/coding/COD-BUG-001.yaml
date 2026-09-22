@@ -1,0 +1,32 @@
+schema_version: "0.1"
+id: COD-BUG-001
+title: Pythonの小規模なバグを修正し、検証テストを通す
+family: coding
+category: bug_fix
+tags: [python, bug-fix, workspace, test-verification]
+fixture: coding/python-bug-fix-v1
+status: draft
+
+task:
+  prompt: |
+    workspace 内の不具合を調査して修正してください。
+    既存の公開APIを壊さず、verify ディレクトリの検証テストを通してください。
+
+constraints:
+  allowed_paths: [workspace]
+  forbidden_paths: [verify]
+  network: disabled
+
+expected:
+  success_conditions:
+    - type: verification_command_exit_code
+      value: 0
+    - type: changed_path_within
+      value: workspace
+  failure_conditions:
+    - type: modified_forbidden_path
+      value: verify
+
+limits:
+  max_steps: 30
+  timeout_seconds: 300
