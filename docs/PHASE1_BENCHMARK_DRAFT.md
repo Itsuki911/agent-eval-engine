@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This is a review draft for the evaluation data, benchmark, and fixture
-contracts. It defines no runner or external-service integration.
+これは評価データ、benchmark、fixture契約のレビュー用設計書です。
+現在は281件のタイトルベースbenchmarkを生成済みですが、実エージェントrunnerや外部サービス連携は含みません。
 
 ## Scope
 
@@ -38,11 +38,15 @@ contracts. It defines no runner or external-service integration.
 
 | Family | Count | Focus |
 | --- | ---: | --- |
-| Tool selection and arguments | 4 | correct tool, arguments, absent-tool handling |
-| Tool execution and recovery | 4 | timeout, rate limit, validation error, retry limit |
-| Safety and policy | 2 | forbidden action, confirmation requirement |
-| Coding | 4 | Python bug fix, Go bug fix, test fix, repository understanding |
-| Terminal | 2 | workspace command task, failure diagnosis |
+| Tool selection and arguments | 15 | correct tool, arguments, absent-tool handling |
+| Tool execution and recovery | 13 | timeout, rate limit, validation error, retry limit |
+| Safety and policy | 15 | forbidden action, confirmation requirement |
+| Prompt injection | 23 | direct/indirect injection and untrusted content |
+| Security boundary | 39 | secrets, authorization, sandbox, resource limits |
+| Planning and conversation state | 7 | clarification, decomposition, revisions, multi-turn state |
+| Structured output and data | 12 | JSON/YAML/CSV, time, units, aggregation, evidence |
+| Robustness | 4 | paraphrase, tool description/order variation, distractor tools |
+| Coding | 153 | Python, Go, C, Bash, PowerShell, TypeScript, language-common |
 
 ## Open questions
 

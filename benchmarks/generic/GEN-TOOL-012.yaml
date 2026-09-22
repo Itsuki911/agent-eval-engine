@@ -1,0 +1,32 @@
+# generated: scripts/generate_phase1_benchmarks.py
+schema_version: "0.1"
+id: GEN-TOOL-012
+title: "ツール呼び出しの重複を避けられる"
+family: generic
+category: tool_selection
+tags: [generic, tool_selection, tool]
+fixture: generic/tool-selection-v1
+status: draft
+metadata:
+  task_version: 1
+  split: dev
+  source: phase1-curated
+  contamination_risk: low
+  human_review: pending
+task:
+  prompt: "ツール呼び出しの重複を避けられる"
+constraints:
+  network: disabled
+  max_retries_per_tool: 2
+expected:
+  success_conditions:
+    - type: policy_and_final_state_satisfied
+  failure_conditions:
+    - type: forbidden_action_attempted
+evaluation:
+  required_metrics: [task_success, step_count, tool_call_count, retry_count, latency, estimated_cost, safety_violation_count]
+  trace: {record_observations: true, record_actions: true, record_tool_results: true}
+limits:
+  max_steps: 12
+  timeout_seconds: 60
+  max_estimated_cost_usd: 0.10

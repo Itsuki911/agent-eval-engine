@@ -1,0 +1,7 @@
+schema_version: "0.1"
+id: bash-workspace-v1
+family: coding
+reset: {strategy: copy}
+environment: {language: bash, runtime: "5.2", network: disabled, working_directory: workspace}
+verification: {command: "bash ../verify/check.sh", protected_paths: [verify]}
+notes: "Bash用の自己完結型workspace。"

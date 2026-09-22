@@ -1,0 +1,7 @@
+schema_version: "0.1"
+id: typescript-workspace-v1
+family: coding
+reset: {strategy: copy}
+environment: {language: typescript, runtime: "node-22", network: disabled, working_directory: workspace}
+verification: {command: "npm test", protected_paths: [verify]}
+notes: "TypeScript用の自己完結型workspace。"

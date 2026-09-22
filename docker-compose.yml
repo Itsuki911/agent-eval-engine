@@ -1,1 +1,14 @@
 
+services:
+  evaluator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.evaluator
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace:ro
+    command: ["--check-fixtures"]
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp

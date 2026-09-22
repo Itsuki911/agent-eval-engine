@@ -18,8 +18,27 @@
       "properties": { "prompt": { "type": "string", "minLength": 1 } },
       "additionalProperties": false
     },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "task_version": { "type": "integer", "minimum": 1 },
+        "split": { "type": "string", "enum": ["dev", "test", "heldout"] },
+        "source": { "type": "string" },
+        "contamination_risk": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+        "human_review": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "additionalProperties": false
+    },
     "constraints": { "type": "object" },
     "expected": { "type": "object", "required": ["success_conditions"], "properties": { "success_conditions": { "type": "array", "minItems": 1 }, "failure_conditions": { "type": "array" } } },
+    "evaluation": {
+      "type": "object",
+      "properties": {
+        "required_metrics": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "trace": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "limits": { "type": "object", "properties": { "max_steps": { "type": "integer", "minimum": 1 }, "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 }, "max_estimated_cost_usd": { "type": "number", "minimum": 0 } } },
     "status": { "type": "string", "enum": ["draft", "active", "deprecated"] }
   },

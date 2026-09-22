@@ -1,0 +1,7 @@
+schema_version: "0.1"
+id: common-workspace-v1
+family: coding
+reset: {strategy: copy}
+environment: {language: multi, network: disabled, working_directory: workspace}
+verification: {command: "python ../verify/check.py", protected_paths: [verify]}
+notes: "テスト、設計、理解、品質、安全性、変更制約を横断する言語共通fixture。"

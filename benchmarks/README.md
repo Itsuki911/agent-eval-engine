@@ -1,22 +1,25 @@
-# Benchmarks
+# ベンチマーク
 
-Each YAML file is a task contract. It states what the agent must achieve and
-how success is evaluated; it does not embed mutable fixture state.
+このフォルダには、エージェントへ与えるタスクと採点契約をYAMLで置きます。環境の初期状態やツールの応答は `fixtures/` に分離します。
 
-## Naming
+## 構成
 
-- `GEN-<AREA>-NNN`: generic tool, recovery, robustness, or safety task.
-- `COD-<AREA>-NNN`: coding task.
-- `TERM-<AREA>-NNN`: terminal-specific task.
-- Future: `WEB-<AREA>-NNN` and `GUI-<AREA>-NNN`.
+- `generic/`: ツール選択、回復性、安全性、プロンプトインジェクション、境界保護。
+- `coding/`: Python、Go、C、Bash、PowerShell、TypeScriptの開発タスク。
+- `catalog.json`: 生成済みタスクのID、title、category、fixtureの一覧。
 
-Use one immutable ID per task. Retire an invalid task rather than reusing its
-ID. Increment a fixture version when its initial state changes materially.
+## 命名規則
 
-## Authoring checklist
+- `GEN-<AREA>-NNN.yaml`: 汎用エージェント評価。
+- `COD-<LANGUAGE>-NNN.yaml`: coding agent評価。
 
-1. Reference a fixture by `family/id-vN`.
-2. Define observable success conditions and failure conditions.
-3. Use action-sequence assertions only when order itself is the requirement.
-4. Set an explicit step, time, and cost limit when relevant.
-5. Add the task to the family's `index.yaml`.
+IDは再利用しません。初期状態を変更する場合はbenchmark IDではなくfixtureの`-vN`を更新します。
+
+## 利用方法
+
+```bash
+python scripts/generate_phase1_benchmarks.py
+python scripts/validate_phase1.py --check-fixtures
+```
+
+詳細は `generic/README.md` と `coding/README.md` を参照してください。

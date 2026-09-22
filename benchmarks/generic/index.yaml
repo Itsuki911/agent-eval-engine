@@ -1,7 +1,4 @@
 schema_version: "0.1"
 family: generic
-benchmarks:
-  - id: GEN-RECOVERY-001
-    path: GEN-RECOVERY-001.yaml
-    status: draft
-    tags: [tool, recovery, timeout]
+count: 128
+source: scripts/generate_phase1_benchmarks.py

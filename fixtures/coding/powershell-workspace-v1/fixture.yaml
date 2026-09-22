@@ -1,0 +1,7 @@
+schema_version: "0.1"
+id: powershell-workspace-v1
+family: coding
+reset: {strategy: copy}
+environment: {language: powershell, runtime: "7.5", network: disabled, working_directory: workspace}
+verification: {command: "pwsh -File ../verify/check.ps1", protected_paths: [verify]}
+notes: "PowerShell用の自己完結型workspace。"

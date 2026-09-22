@@ -1,0 +1,11 @@
+{
+  "name": "phase1-typescript-fixture",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}
