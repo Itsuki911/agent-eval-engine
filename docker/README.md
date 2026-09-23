@@ -23,3 +23,13 @@ docker compose run --rm evaluator
 ## 注意
 
 coding fixtureのPython、Go、C、Bash、PowerShell、TypeScriptの実際のビルド・テストはPhase 3以降に言語別runnerとして追加します。Phase 1では、各fixtureに必要な言語、検証コマンド、保護対象パスを宣言し、データ契約を先に固定します。
+
+## Windowsの正式サポート
+
+Windowsは正式な評価対象です。PowerShell benchmarkはWindows ContainersモードのDocker Desktopで実行します。
+
+```powershell
+docker compose -f docker-compose.windows.yml run --rm powershell-fixture
+```
+
+Linux containerとWindows containerはDocker Desktopで同時には実行できません。通常のYAML validatorを実行する場合はLinux Containersモード、PowerShell fixtureを実行する場合はWindows Containersモードへ切り替えます。Phase 3ではWindows runnerを追加し、PowerShell以外にもWindowsパス、権限、改行コード、エンコーディングを含む評価を拡張します。

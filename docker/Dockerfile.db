@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+
+# DBテスト実行用
+WORKDIR /workspace
+ENV PYTHONDONTWRITEBYTECODE=1
+
+COPY requirements-db.txt /tmp/requirements-db.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-db.txt
+
+CMD ["pytest", "-q", "tests/unit", "tests/integration"]

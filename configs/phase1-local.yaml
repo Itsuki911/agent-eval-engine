@@ -10,5 +10,12 @@ defaults:
   concurrency: 1
   preserve_trace: true
   fail_on_fixture_reset_error: true
+platforms:
+  linux:
+    supported: true
+    validator_compose_file: docker-compose.yml
+  windows:
+    supported: true
+    powershell_compose_file: docker-compose.windows.yml
 selection:
   statuses: [draft]

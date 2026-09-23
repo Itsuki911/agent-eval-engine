@@ -1,0 +1,11 @@
+services:
+  powershell-fixture:
+    image: mcr.microsoft.com/powershell:lts-windowsservercore-ltsc2022
+    working_dir: C:\workspace\fixtures\coding\powershell-workspace-v1\workspace
+    volumes:
+      - ./:C:\workspace:ro
+    command:
+      - pwsh
+      - -NoProfile
+      - -File
+      - C:\workspace\fixtures\coding\powershell-workspace-v1\verify\check.ps1

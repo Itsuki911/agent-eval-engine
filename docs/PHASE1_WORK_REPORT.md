@@ -47,4 +47,4 @@ benchmarkは「何を達成すれば成功か」、fixtureは「どの状態か�
 ## 確認・質問点
 
 - 281件はすべて `human_review: pending` のタイトルベース定義です。完成形では、各タスクの具体的な入力、期待最終状態、攻撃ペイロード、故障したworkspace、検証テストを人間レビューしてから `approved` に変更する必要があります。
-- C、Bash、PowerShell、TypeScriptを追加しました。Phase 3で言語別runnerを作る際に、どのOS（Linuxのみ／Windowsを含む）を正式サポートするかを決める必要があります。
+- Windowsを正式サポートする方針に決定しました。PowerShell fixture用に `docker-compose.windows.yml` を追加しています。Linux ContainersモードとWindows Containersモードは同時利用できないため、実行対象に応じてDocker Desktopのコンテナモードを切り替えます。
