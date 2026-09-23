@@ -4,8 +4,8 @@
 AIエージェントのタスク成功だけでなく、ツール利用、回復性、安全性、コスト、遅延、
 coding品質を評価するためのフレームワークです。
 
-現在はPhase 1のbenchmark・fixture・Docker検証環境と、Phase 2のPostgreSQL永続化基盤を提供します。
-エージェント実行、REST API、MCPは後続Phaseの対象です。
+現在はPhase 1のbenchmark・fixture、Phase 2のPostgreSQL永続化、Phase 3のPython評価エンジンを提供します。
+REST APIとMCPは後続Phaseの対象です。
 
 ## Phase 1の内容
 
@@ -39,6 +39,25 @@ docker compose exec db psql -U agent_eval -d agent_eval
 ```
 
 psql内の`\dt`でテーブル一覧を、`SELECT * FROM events;`で保存済みイベントを確認できます。原文には秘密情報が含まれる可能性があるため、ローカル開発環境以外で利用する前にマスキング方針を決めてください。
+
+## Phase 3: Python評価エンジン
+
+LangGraphで、benchmark読込、実行、イベント収集、評価、PostgreSQL保存を順番に実行します。モデル設定は[configs/phase3-local.yaml](configs/phase3-local.yaml)、APIキーは`.env`の`OPENROUTER_API_KEY`で管理します。
+
+### dry-runの実行
+
+初回は外部APIを呼ばないdry-runを使います。`.env.example`を`.env`へコピーしてDBパスワードを設定した後、次を実行します。
+
+```bash
+docker compose --profile engine build engine
+docker compose --profile engine run --rm engine python scripts/run_evaluation.py --benchmark benchmarks/generic/GEN-TOOL-001.yaml
+```
+
+期待結果: 最後に表示されるJSONの`status`が`simulated`になり、`run_id`、`event_count`、評価指標が表示されます。イベント、指標、評価結果はPostgreSQLへ保存されます。
+
+### OpenRouterを使う実行
+
+`configs/phase3-local.yaml`の`engine.dry_run`を`false`へ変更し、`.env`の`OPENROUTER_API_KEY`に有効なキーを設定してから同じコマンドを実行します。実行時はAPI費用が発生する可能性があります。Phase 3ではツール・workspaceを実行しないため、`simulated`は実ツール評価の結果ではありません。
 
 ## はじめ方
 

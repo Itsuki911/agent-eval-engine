@@ -1,0 +1,14 @@
+engine:
+  agent_name: phase3-evaluator
+  dry_run: true
+  max_steps: 12
+model:
+  provider: openrouter
+  model: openai/gpt-4o-mini
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
+  timeout_seconds: 60
+  temperature: 0
+telemetry:
+  service_name: agent-eval-engine
+  exporter: console

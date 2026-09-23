@@ -33,7 +33,25 @@ services:
         condition: service_healthy
     volumes:
       - ./:/workspace
-    command: ["pytest", "-q", "tests/unit", "tests/integration"]
+    command: ["pytest", "-q", "tests/integration/test_postgresql_persistence.py"]
+
+  # 評価エンジン実行用Python
+  engine:
+    profiles: ["engine"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.engine
+    working_dir: /workspace
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_eval}:${POSTGRES_PASSWORD:-local-development-password}@db:5432/${POSTGRES_DB:-agent_eval}
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_eval}:${POSTGRES_PASSWORD:-local-development-password}@db:5432/agent_eval_test
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-replace-with-your-openrouter-api-key}
+      PYTHONPATH: /workspace:/workspace/packages/core
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/workspace
 
   evaluator:
     build:

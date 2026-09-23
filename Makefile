@@ -1,5 +1,5 @@
 
-.PHONY: generate-phase1 validate-phase1 docker-validate-phase1 db-up db-migrate db-test db-shell
+.PHONY: generate-phase1 validate-phase1 docker-validate-phase1 db-up db-migrate db-test db-shell phase3-dry-run phase3-test
 
 generate-phase1:
 	python scripts/generate_phase1_benchmarks.py
@@ -21,3 +21,9 @@ db-test:
 
 db-shell:
 	docker compose exec db psql -U agent_eval -d agent_eval
+
+phase3-dry-run:
+	docker compose --profile engine run --rm engine python scripts/run_evaluation.py --benchmark benchmarks/generic/GEN-TOOL-001.yaml
+
+phase3-test:
+	docker compose --profile engine run --rm engine pytest -q tests/unit/test_phase3_config.py tests/unit/test_phase3_metrics.py tests/integration/test_phase3_workflow.py
