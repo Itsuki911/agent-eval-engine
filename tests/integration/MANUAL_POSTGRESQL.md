@@ -7,13 +7,13 @@
 ```bash
 docker compose up -d db
 docker compose run --rm db-tools alembic upgrade head
-docker compose exec db psql -U agent_eval -d agent_eval -c "\\dt"
+docker compose exec db psql -U agent_eval -d agent_eval -c '\dt'
 ```
 
 1. `.env.example`を`.env`へコピーしてパスワードを変更する。
 2. `docker compose up -d db`を実行する。
 3. `docker compose run --rm db-tools alembic upgrade head`を実行する。
-4. `docker compose exec db psql -U agent_eval -d agent_eval -c "\\dt"`を実行する。
+4. `docker compose exec db psql -U agent_eval -d agent_eval -c '\dt'`を実行する。
 
 期待結果: コマンドが成功し、`runs`、`events`、`metrics`、`evaluations`、`alembic_version`が表示される。
 
@@ -23,8 +23,10 @@ docker compose exec db psql -U agent_eval -d agent_eval -c "\\dt"
 
 ```bash
 docker compose up -d db
-docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_persistence.py -k reconstruct_complete_history
+docker compose run --rm db-tools pytest -v tests/integration/test_postgresql_persistence.py -k reconstruct_complete_history
 ```
+
+テストファイル名だけをPowerShellで実行せず、上記の`docker compose run`行をそのまま実行する。
 
 1. 実行コマンドを実行する。
 2. テスト出力を確認する。
@@ -50,7 +52,7 @@ docker compose run --rm -e DATABASE_URL=postgresql+psycopg://agent_eval:wrong-pa
 
 ```bash
 docker compose up -d db
-docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_persistence.py -k duplicate_event_sequence
+docker compose run --rm db-tools pytest -v tests/integration/test_postgresql_persistence.py -k duplicate_event_sequence
 ```
 
 1. 実行コマンドを実行する。

@@ -6,7 +6,7 @@
 
 ```bash
 docker compose up -d db
-docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_persistence.py -k reconstruct_complete_history
+docker compose run --rm db-tools pytest -v tests/integration/test_postgresql_persistence.py -k reconstruct_complete_history
 ```
 
 1. `RunRepository.create_run` を呼び出す。
@@ -20,7 +20,7 @@ docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_per
 
 ```bash
 docker compose up -d db
-docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_persistence.py -k duplicate_event_sequence
+docker compose run --rm db-tools pytest -v tests/integration/test_postgresql_persistence.py -k duplicate_event_sequence
 ```
 
 1. 同じ実行IDと`sequence=0`でイベントを1件保存する。
@@ -34,7 +34,7 @@ docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_per
 
 ```bash
 docker compose up -d db
-docker compose run --rm db-tools pytest -q tests/integration/test_postgresql_persistence.py -k unknown_run
+docker compose run --rm db-tools pytest -v tests/integration/test_postgresql_persistence.py -k unknown_run
 ```
 
 1. 未登録のUUIDで `RunRepository.finish_run` を呼び出す。
