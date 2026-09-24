@@ -20,9 +20,25 @@ def test_load_phase3_settings() -> None:
     assert settings.model.provider == "openrouter"
     assert settings.model.api_key_env == "OPENROUTER_API_KEY"
     assert settings.model.max_retries == 1
+    assert settings.model.connect_timeout_seconds == 10
+    assert settings.model.read_timeout_seconds == 60
+    assert settings.model.retryable_status_codes == [408, 429, 500, 502, 503, 504]
+    assert settings.model.retry_backoff_initial_seconds == 1.0
+    assert settings.model.retry_backoff_max_seconds == 10.0
+    assert settings.model.retry_jitter == 0.2
+    assert settings.model.max_input_tokens == 4096
+    assert settings.model.max_prompt_chars == 16000
+    assert settings.model.max_output_tokens == 1024
+    assert settings.model.max_estimated_cost_usd == 0.10
+    assert settings.model.max_cost_per_run_usd == 1.00
+    assert settings.model.validate_structured_output is True
+    assert settings.model.response_format == "json_object"
+    assert settings.model.response_schema is None
+    assert settings.model.idempotency_key_mode == "per_request"
     print(
         "設定読込: dry_run=True, provider=openrouter, "
-        "api_key_env=OPENROUTER_API_KEY, max_retries=1"
+        "api_key_env=OPENROUTER_API_KEY, max_retries=1, "
+        "resilience/limits/validation config loaded successfully"
     )
 
 
