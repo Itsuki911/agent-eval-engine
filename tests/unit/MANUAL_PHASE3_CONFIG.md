@@ -81,3 +81,16 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_pha
 2. `OpenRouter接続:` から始まる結果を確認する。
 
 期待結果: 異常系。`OpenRouter接続: タイムアウトを専用例外へ変換` と表示される。OpenRouter SDKのタイムアウトは、`timeout_seconds`と`max_retries`を示す専用例外として扱われる。外部APIへは通信しない。
+
+## UT-CONFIG-007 OpenRouterのレート制限を専用例外へ変換できる（異常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_openrouter.py -k rate_limit_is_converted
+```
+
+1. 実行コマンドを実行する。
+2. `OpenRouter接続:` から始まる結果を確認する。
+
+期待結果: 異常系。`OpenRouter接続: レート制限を専用例外へ変換` と表示される。HTTP 429のレート制限は、対象モデルと再試行設定を示す専用例外として扱われる。外部APIへは通信しない。

@@ -39,6 +39,6 @@ docker compose --profile engine run --rm -e RUN_LIVE_OPENROUTER_E2E engine pytes
 2. 実行コマンドを順に実行する。
 3. `OpenRouter E2E:` から始まる結果を確認する。
 
-期待結果: 正常系。`model`、`status`、LLMの`answer`、`events`、`metrics=16`、`evaluation=passed`または`evaluation=failed`が表示される。`dry_run=False`の実行履歴がテストDBへ保存・復元される。タスクの評価結果が`failed`でも、モデル応答・イベント・指標・評価結果を保存できればE2Eテスト自体は成功である。テスト終了時には、このテストが作成したrunだけを削除する。
+期待結果: 正常系。`model`、`status`、LLMの`answer`、`events`、`metrics=16`、`evaluation=passed`または`evaluation=failed`が表示される。`dry_run=False`の実行履歴がテストDBへ保存・復元される。タスクの評価結果が`failed`でも、モデル応答・イベント・指標・評価結果を保存できればE2Eテスト自体は成功である。OpenRouterが429を返す場合は、`rate_limit_error`と`failure_category=rate_limit`として記録される。テスト終了時には、このテストが作成したrunだけを削除する。
 
 備考: OpenRouterへの外部通信とモデル利用料金が発生する可能性がある。`RUN_LIVE_OPENROUTER_E2E=1`を指定しない限り、このテストはskipされる。APIキーは出力しない。

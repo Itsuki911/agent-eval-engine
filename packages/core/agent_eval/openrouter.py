@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
-from openai import APITimeoutError, OpenAI
+from openai import APITimeoutError, OpenAI, RateLimitError
 
 from agent_eval.config import ModelSettings, load_api_key
 
@@ -24,6 +24,11 @@ class ModelResponse:
 
 # OpenRouter応答時間超過を表す
 class OpenRouterTimeoutError(RuntimeError):
+    pass
+
+
+# OpenRouterレート制限を表す
+class OpenRouterRateLimitError(RuntimeError):
     pass
 
 
@@ -58,6 +63,13 @@ class OpenRouterClient:
                 f"max_retries={self._settings.max_retries}"
             )
             raise OpenRouterTimeoutError(message) from error
+        except RateLimitError as error:
+            message = (
+                "OpenRouterのレート制限に達しました。"
+                f"model={self._settings.model}, "
+                f"max_retries={self._settings.max_retries}"
+            )
+            raise OpenRouterRateLimitError(message) from error
         duration_ms = (perf_counter() - started_at) * 1000
         usage = completion.usage
         content = completion.choices[0].message.content or ""

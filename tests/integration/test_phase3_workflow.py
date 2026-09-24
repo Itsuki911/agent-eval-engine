@@ -15,7 +15,7 @@ from agent_eval.agent import AgentResult
 from agent_eval.benchmark import BenchmarkDefinition
 from agent_eval.config import load_settings
 from agent_eval.events import EventCollector
-from agent_eval.openrouter import OpenRouterTimeoutError
+from agent_eval.openrouter import OpenRouterRateLimitError, OpenRouterTimeoutError
 from agent_eval.workflow import EvaluationService
 from database.repositories import RunRepository
 from database.session import create_db_engine
@@ -64,6 +64,13 @@ class TimeoutAgent:
     # OpenRouterタイムアウトを再現する
     def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
         raise OpenRouterTimeoutError("OpenRouterの応答がタイムアウトしました")
+
+
+# テスト用のレート制限実行器を表す
+class RateLimitedAgent:
+    # OpenRouterレート制限を再現する
+    def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
+        raise OpenRouterRateLimitError("OpenRouterのレート制限に達しました")
 
 
 # 出力を抑えた設定を作る
@@ -126,4 +133,21 @@ def test_timeout_is_persisted(session: Session) -> None:
         "タイムアウト保存: "
         f"status={result.status}, failure_category={history['failure_category']}, "
         "event_type=timeout_error"
+    )
+
+
+# レート制限をイベントへ保存できる
+def test_rate_limit_is_persisted(session: Session) -> None:
+    service = EvaluationService(_test_settings(), session, RateLimitedAgent())
+
+    result = service.run(PROJECT_ROOT / "benchmarks" / "generic" / "GEN-TOOL-001.yaml")
+    history = RunRepository(session).reconstruct_history(result.run_id)
+
+    assert result.status == "failed"
+    assert history["failure_category"] == "rate_limit"
+    assert any(event["event_type"] == "rate_limit_error" for event in history["events"])
+    print(
+        "レート制限保存: "
+        f"status={result.status}, failure_category={history['failure_category']}, "
+        "event_type=rate_limit_error"
     )

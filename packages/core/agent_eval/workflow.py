@@ -16,7 +16,7 @@ from agent_eval.benchmark import BenchmarkDefinition, load_benchmark
 from agent_eval.config import Phase3Settings
 from agent_eval.events import EventCollector
 from agent_eval.metrics import ComputedMetric, calculate_metrics
-from agent_eval.openrouter import OpenRouterTimeoutError
+from agent_eval.openrouter import OpenRouterRateLimitError, OpenRouterTimeoutError
 from agent_eval.telemetry import Telemetry, create_telemetry
 from database.repositories import RunRepository
 
@@ -132,6 +132,16 @@ class EvaluationService:
             return {
                 "final_state": {"success": False, "error": str(error), "dry_run": False},
                 "failure_category": "timeout",
+            }
+        except OpenRouterRateLimitError as error:
+            collector.record(
+                "rate_limit_error",
+                {"message": str(error), "source": "openrouter"},
+                error={"type": type(error).__name__, "message": str(error)},
+            )
+            return {
+                "final_state": {"success": False, "error": str(error), "dry_run": False},
+                "failure_category": "rate_limit",
             }
         except Exception as error:
                 collector.record(

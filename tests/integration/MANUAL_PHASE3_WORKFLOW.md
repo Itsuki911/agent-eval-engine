@@ -55,3 +55,16 @@ docker compose --profile engine run --rm engine pytest -v -s tests/integration/t
 2. `タイムアウト保存:` から始まる結果を確認する。
 
 期待結果: 異常系。`status=failed`、`failure_category=timeout`、`event_type=timeout_error` が表示される。タイムアウトは未分類の例外ではなく、DBのイベント・失敗分類・評価結果として保存される。外部APIへは通信しない。
+
+## IT-WORKFLOW-005 OpenRouterのレート制限を失敗履歴として保存できる（異常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/integration/test_phase3_workflow.py -k rate_limit_is_persisted
+```
+
+1. 実行コマンドを実行する。
+2. `レート制限保存:` から始まる結果を確認する。
+
+期待結果: 異常系。`status=failed`、`failure_category=rate_limit`、`event_type=rate_limit_error` が表示される。HTTP 429のレート制限は、未分類の例外ではなくDBのイベント・失敗分類・評価結果として保存される。外部APIへは通信しない。

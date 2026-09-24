@@ -1,11 +1,16 @@
 """Phase 3のOpenRouter接続設定を確認する。"""
 
 import pytest
-from openai import APITimeoutError
+import httpx2
+from openai import APITimeoutError, RateLimitError
 
 from agent_eval.agent import OpenRouterAgent
 from agent_eval.config import Phase3Settings, load_settings
-from agent_eval.openrouter import OpenRouterClient, OpenRouterTimeoutError
+from agent_eval.openrouter import (
+    OpenRouterClient,
+    OpenRouterRateLimitError,
+    OpenRouterTimeoutError,
+)
 
 
 # APIキー未設定の設定を作る
@@ -41,3 +46,25 @@ def test_openrouter_timeout_is_converted(monkeypatch: pytest.MonkeyPatch) -> Non
     with pytest.raises(OpenRouterTimeoutError, match="max_retries=1"):
         client.complete("system", "user")
     print("OpenRouter接続: タイムアウトを専用例外へ変換")
+
+
+# OpenRouterレート制限を分類する
+def test_openrouter_rate_limit_is_converted(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = load_settings("configs/phase3-local.yaml")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    client = OpenRouterClient(settings.model)
+
+    class RateLimitedCompletions:
+        # レート制限を再現する
+        def create(self, **kwargs):
+            response = httpx2.Response(
+                429,
+                request=httpx2.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
+            )
+            raise RateLimitError("provider rate limited", response=response, body={})
+
+    client._client.chat.completions = RateLimitedCompletions()
+
+    with pytest.raises(OpenRouterRateLimitError, match="レート制限"):
+        client.complete("system", "user")
+    print("OpenRouter接続: レート制限を専用例外へ変換")

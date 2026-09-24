@@ -77,6 +77,7 @@ def test_openrouter_live_workflow_persists_history(live_db_engine) -> None:
                 "model_response" in event_types
                 or "model_error" in event_types
                 or "timeout_error" in event_types
+                or "rate_limit_error" in event_types
             )
             assert len(stored_run.metrics) == 16
             assert evaluation.status in {"passed", "failed"}
