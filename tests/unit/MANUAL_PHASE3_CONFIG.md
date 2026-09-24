@@ -1,5 +1,9 @@
 # Phase 3設定とデータ検証の手動単体テスト
 
+## 共通出力形式
+
+`pytest -s`で表示される確認結果は1行JSONである。`test`はテスト名、`result`は`passed`、それ以外は期待値を確認するキーである。下記の期待結果にある表示文は、対応するJSONのキー・値で確認する。APIキーは出力しない。
+
 ## UT-CONFIG-001 設定YAMLを読み込みOpenRouter設定を取得できる（正常系）
 
 実行コマンド:
@@ -11,7 +15,7 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_pha
 1. 実行コマンドを実行する。
 2. テスト名と結果を確認する。
 
-期待結果: 正常系。`設定読込: dry_run=True, provider=openrouter, api_key_env=OPENROUTER_API_KEY, max_retries=1` と表示される。設定YAMLから dry-run、有効なプロバイダー、APIキーの環境変数名、最大再試行回数を取得できる。
+期待結果: 正常系。`設定読込: model=<設定中のモデル名>, dry_run=True, provider=openrouter, api_key_env=OPENROUTER_API_KEY, max_retries=1` と表示される。設定YAMLから現在のモデル名、dry-run、有効なプロバイダー、APIキーの環境変数名、最大再試行回数を取得できる。
 
 ## UT-CONFIG-002 プレースホルダーのAPIキーを拒否できる（異常系）
 
@@ -24,7 +28,7 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_pha
 1. 実行コマンドを実行する。
 2. テスト名と結果を確認する。
 
-期待結果: 異常系。`APIキー検証: プレースホルダーを拒否し、外部通信を開始しない` と表示される。APIキーの値そのものは表示されず、仮のキーでクライアントを作成しない。
+期待結果: 異常系。`APIキー検証: model=<設定中のモデル名>, プレースホルダーを拒否し、外部通信を開始しない` と表示される。現在のモデル名は表示されるが、APIキーの値そのものは表示されず、仮のキーでクライアントを作成しない。
 
 ## UT-CONFIG-003 Phase 1 benchmarkを検証して読み込める（正常系）
 
@@ -65,7 +69,7 @@ docker compose --profile engine run --rm -e RUN_LIVE_OPENROUTER_UNIT engine pyte
 2. 実行コマンドを順に実行する。
 3. `OpenRouter Unit:` から始まる結果を確認する。
 
-期待結果: 正常系。`model`、`success`、モデルの`answer`、`input_tokens`、`output_tokens`、`duration_ms`が表示される。応答は`success`と`final_answer`を持つJSONとして解析できる。APIキーは表示しない。
+期待結果: 正常系。API呼出前に `OpenRouter Unit: configured_model=<設定中のモデル名>` が表示される。成功時は`model`、`success`、モデルの`answer`、`input_tokens`、`output_tokens`、`llm_cost_usd`、`duration_ms`が表示される。`llm_cost_usd`は今回のAPI LLM応答に対してOpenRouterが返した料金である。429などで失敗した場合も、呼出対象のモデル名を確認できる。APIキーは表示しない。
 
 備考: OpenRouterへの外部通信とモデル利用料金が発生する可能性がある。`RUN_LIVE_OPENROUTER_UNIT=1`を指定しない限り、このテストはskipされる。
 
@@ -80,7 +84,7 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_pha
 1. 実行コマンドを実行する。
 2. `OpenRouter接続:` から始まる結果を確認する。
 
-期待結果: 異常系。`OpenRouter接続: タイムアウトを専用例外へ変換` と表示される。OpenRouter SDKのタイムアウトは、`timeout_seconds`と`max_retries`を示す専用例外として扱われる。外部APIへは通信しない。
+期待結果: 異常系。`OpenRouter接続: model=<設定中のモデル名>, タイムアウトを専用例外へ変換` と表示される。OpenRouter SDKのタイムアウトは、対象モデルと`timeout_seconds`・`max_retries`を示す専用例外として扱われる。外部APIへは通信しない。
 
 ## UT-CONFIG-007 OpenRouterのレート制限を専用例外へ変換できる（異常系）
 
@@ -93,4 +97,4 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_pha
 1. 実行コマンドを実行する。
 2. `OpenRouter接続:` から始まる結果を確認する。
 
-期待結果: 異常系。`OpenRouter接続: レート制限を専用例外へ変換` と表示される。HTTP 429のレート制限は、対象モデルと再試行設定を示す専用例外として扱われる。外部APIへは通信しない。
+期待結果: 異常系。`OpenRouter接続: model=<設定中のモデル名>, レート制限を専用例外へ変換` と表示される。HTTP 429のレート制限は、対象モデルと再試行設定を示す専用例外として扱われる。外部APIへは通信しない。

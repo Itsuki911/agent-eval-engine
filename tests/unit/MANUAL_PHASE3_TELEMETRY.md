@@ -1,5 +1,9 @@
 # Phase 3観測機能の手動単体テスト
 
+## 共通出力形式
+
+`pytest -s`で表示される確認結果は1行JSONである。`test`はテスト名、`result`は`passed`、`sequence`・`trace_id_length`・`span_id_length`で追跡情報を確認する。下記の期待結果にある表示文は、対応するJSONのキー・値で確認する。
+
 ## UT-TELEMETRY-001 イベントへtrace IDとspan IDを付与できる（正常系）
 
 実行コマンド:

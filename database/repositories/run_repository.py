@@ -123,6 +123,7 @@ class RunRepository:
         status: str,
         final_state: dict[str, Any],
         failure_category: str | None = None,
+        llm_cost_usd: float | None = None,
     ) -> Run:
         run = self.get_run(run_id)
         if run is None:
@@ -130,6 +131,7 @@ class RunRepository:
         run.status = status
         run.final_state = final_state
         run.failure_category = failure_category
+        run.llm_cost_usd = llm_cost_usd
         run.finished_at = datetime.now(timezone.utc)
         self.session.flush()
         return run
@@ -163,6 +165,7 @@ class RunRepository:
             "run_config": run.run_config,
             "final_state": run.final_state,
             "failure_category": run.failure_category,
+            "llm_cost_usd": float(run.llm_cost_usd) if run.llm_cost_usd is not None else None,
             "started_at": run.started_at.isoformat(),
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
             "events": [

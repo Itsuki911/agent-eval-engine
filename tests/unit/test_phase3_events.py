@@ -3,6 +3,7 @@
 from agent_eval.config import TelemetrySettings
 from agent_eval.events import EventCollector
 from agent_eval.telemetry import create_telemetry
+from tests.output import print_test_result
 
 
 # イベントへ追跡IDを付与する
@@ -16,8 +17,10 @@ def test_event_collector_adds_trace_context() -> None:
     assert event.sequence == 0
     assert event.trace_id is not None
     assert event.span_id is not None
-    print(
-        "追跡情報: sequence=0, "
-        f"trace_id_length={len(event.trace_id)}, "
-        f"span_id_length={len(event.span_id)}"
+    print_test_result(
+        "event_collector_adds_trace_context",
+        "passed",
+        sequence=event.sequence,
+        trace_id_length=len(event.trace_id),
+        span_id_length=len(event.span_id),
     )

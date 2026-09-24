@@ -1,5 +1,9 @@
 # Phase 3評価ワークフローの手動統合テスト
 
+## 共通出力形式
+
+`pytest -s`で表示される確認結果は1行JSONである。`test`はテスト名、`result`は`passed`、`status`・`failure_category`・`event_type`・`llm_cost_usd`などのキーでDB保存結果を確認する。下記の期待結果にある表示文は、対応するJSONのキー・値で確認する。
+
 ## IT-WORKFLOW-001 dry-runで評価実行を保存できる（正常系）
 
 実行コマンド:
@@ -11,7 +15,7 @@ docker compose --profile engine run --rm engine pytest -v -s tests/integration/t
 1. 実行コマンドを実行する。
 2. テスト名と結果を確認する。
 
-期待結果: 正常系。`status=simulated`、`events=8以上`、`metrics=16`、`evaluation=simulated` が表示される。実行履歴は連番で保存・復元され、レイテンシ指標を含む16件の指標と評価結果がテストDBへ保存される。
+期待結果: 正常系。`status=simulated`、`events=8以上`、`metrics=16`、`evaluation=simulated` が表示される。dry-runでは `llm_cost_usd` を端末出力・runs・evaluation summaryへ保存しない。実行履歴は連番で保存・復元され、レイテンシ指標を含む16件の指標と評価結果がテストDBへ保存される。
 
 ## IT-WORKFLOW-002 モデル失敗をイベントと失敗分類へ保存できる（異常系）
 
@@ -81,3 +85,16 @@ docker compose --profile engine run --rm engine pytest -v -s tests/integration/t
 2. 各 `例外保存:` の出力を確認する。
 
 期待結果: 異常系。`auth`、`input_limit`、`connection`、`safety_filter`、`structured_output`、`cost_limit`、`retry_limit` の各分類について、`status=failed` と対応する `{分類}_error` eventが表示される。各例外のevents・failure_category・evaluationがテストDBへ保存される。外部APIへは通信しない。
+
+## IT-WORKFLOW-007 API LLM料金を実行履歴へ保存できる（正常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/integration/test_phase3_workflow.py -k live_llm_cost_is_persisted
+```
+
+1. 実行コマンドを実行する。
+2. `LLM料金保存:` から始まる結果を確認する。
+
+期待結果: 正常系。`llm_cost_usd=0.01250000` が表示される。API LLM実行の料金は、runsの`llm_cost_usd`、evaluation summary、復元した実行履歴へ同じ値で保存される。外部APIへは通信しない。

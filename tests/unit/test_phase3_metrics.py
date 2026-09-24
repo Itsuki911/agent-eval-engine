@@ -2,6 +2,7 @@
 
 from agent_eval.events import CollectedEvent
 from agent_eval.metrics import calculate_metrics
+from tests.output import print_test_result
 
 
 # 指標を名前で取得する
@@ -22,9 +23,13 @@ def test_calculate_metrics_for_successful_run() -> None:
     assert values["tool_success_rate"] == 1
     assert values["estimated_cost_usd"] == 0.01
     assert values["end_to_end_latency_ms"] == 100
-    print(
-        "指標計算: task_success=1, tool_success_rate=1, "
-        "estimated_cost_usd=0.01, end_to_end_latency_ms=100"
+    print_test_result(
+        "calculate_metrics_for_successful_run",
+        "passed",
+        task_success=values["task_success"],
+        tool_success_rate=values["tool_success_rate"],
+        estimated_cost_usd=values["estimated_cost_usd"],
+        end_to_end_latency_ms=values["end_to_end_latency_ms"],
     )
 
 
@@ -36,7 +41,12 @@ def test_safety_violation_rejects_task_success() -> None:
 
     assert values["task_success"] == 0
     assert values["safety_violation_count"] == 1
-    print("安全判定: task_success=0, safety_violation_count=1")
+    print_test_result(
+        "safety_violation_rejects_task_success",
+        "passed",
+        task_success=values["task_success"],
+        safety_violation_count=values["safety_violation_count"],
+    )
 
 
 # 重複と回復を計測する
@@ -52,7 +62,10 @@ def test_duplicate_tools_and_recovery_are_measured() -> None:
     assert values["duplicate_action_count"] == 1
     assert values["recovery_success"] == 1
     assert values["retry_count"] == 1
-    print(
-        "回復計測: duplicate_action_count=1, "
-        "recovery_success=1, retry_count=1"
+    print_test_result(
+        "duplicate_tools_and_recovery_are_measured",
+        "passed",
+        duplicate_action_count=values["duplicate_action_count"],
+        recovery_success=values["recovery_success"],
+        retry_count=values["retry_count"],
     )

@@ -25,16 +25,19 @@ def main() -> None:
     session_factory = create_session_factory()
     with session_factory() as session:
         result = EvaluationService(settings, session).run(args.benchmark)
+    output = {
+        "run_id": str(result.run_id),
+        "status": result.status,
+        "benchmark_id": result.benchmark_id,
+        "final_state": result.final_state,
+        "event_count": result.event_count,
+        "metrics": [metric.__dict__ for metric in result.metrics],
+    }
+    if result.llm_cost_usd is not None:
+        output["llm_cost_usd"] = result.llm_cost_usd
     print(
         json.dumps(
-            {
-                "run_id": str(result.run_id),
-                "status": result.status,
-                "benchmark_id": result.benchmark_id,
-                "final_state": result.final_state,
-                "event_count": result.event_count,
-                "metrics": [metric.__dict__ for metric in result.metrics],
-            },
+            output,
             ensure_ascii=False,
             indent=2,
         )

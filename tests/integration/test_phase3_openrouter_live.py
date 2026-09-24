@@ -15,6 +15,7 @@ from agent_eval.config import load_settings
 from agent_eval.workflow import EvaluationService
 from database.repositories import RunRepository
 from database.session import create_db_engine
+from tests.output import print_test_result
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -64,11 +65,20 @@ def test_openrouter_live_workflow_persists_history(live_db_engine) -> None:
             stored_run = RunRepository(session).get_run(result.run_id)
             event_types = [event["event_type"] for event in history["events"]]
             evaluation = stored_run.evaluations[0]
-            print(
-                "OpenRouter Integration: "
-                f"model={live_settings.model.model}, status={result.status}, "
-                f"events={result.event_count}, metrics={len(stored_run.metrics)}, "
-                f"evaluation={evaluation.status}, event_types={event_types}"
+            output = {
+                "model": live_settings.model.model,
+                "status": result.status,
+                "event_count": result.event_count,
+                "metric_count": len(stored_run.metrics),
+                "evaluation_status": evaluation.status,
+                "event_types": event_types,
+            }
+            if result.llm_cost_usd is not None:
+                output["llm_cost_usd"] = result.llm_cost_usd
+            print_test_result(
+                "openrouter_live_workflow_persists_history",
+                "passed",
+                **output,
             )
 
             assert result.final_state["dry_run"] is False
@@ -81,6 +91,10 @@ def test_openrouter_live_workflow_persists_history(live_db_engine) -> None:
             )
             assert len(stored_run.metrics) == 16
             assert evaluation.status in {"passed", "failed"}
+            assert (
+                result.llm_cost_usd is None
+                or float(stored_run.llm_cost_usd) == result.llm_cost_usd
+            )
     finally:
         if run_id is not None:
             with live_db_engine.begin() as connection:

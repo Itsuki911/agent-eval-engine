@@ -66,6 +66,7 @@ class EvaluationResult:
     final_state: dict[str, Any]
     metrics: list[ComputedMetric]
     event_count: int
+    llm_cost_usd: float | None
 
 
 # 評価処理全体を調整する
@@ -88,6 +89,7 @@ class EvaluationService:
             )
         elapsed_ms = (perf_counter() - started_at) * 1000
         metrics = state["metrics"]
+        llm_cost_usd = _live_llm_cost_usd(collector.events())
         self._telemetry.provider.force_flush()
         return EvaluationResult(
             run_id=state["run_id"],
@@ -96,6 +98,7 @@ class EvaluationService:
             final_state=state["final_state"],
             metrics=metrics,
             event_count=len(collector.events()),
+            llm_cost_usd=llm_cost_usd,
         )
 
     # LangGraphを組み立てる
@@ -207,14 +210,19 @@ class EvaluationService:
                 )
             success = bool(state["final_state"].get("success"))
             evaluation_status = "simulated" if state["final_state"].get("dry_run") else "passed" if success else "failed"
+            llm_cost_usd = _live_llm_cost_usd(collector.events())
+            summary = {"dry_run": self._settings.engine.dry_run}
+            if llm_cost_usd is not None:
+                summary["llm_cost_usd"] = llm_cost_usd
             self._repository.add_evaluation(
                 state["run_id"], "rule-based", "0.1", evaluation_status,
                 1.0 if success else 0.0,
-                summary={"dry_run": self._settings.engine.dry_run},
+                summary=summary,
                 findings=[event.error for event in collector.events() if event.error],
             )
             self._repository.finish_run(
-                state["run_id"], "completed" if success else "failed", state["final_state"], state["failure_category"],
+                state["run_id"], "completed" if success else "failed", state["final_state"],
+                state["failure_category"], llm_cost_usd,
             )
             self._repository.session.commit()
             return {}
@@ -246,3 +254,14 @@ def _map_openrouter_error_category(error: OpenRouterError) -> str:
         OpenRouterIdempotencyError: "idempotency",
     }
     return category_map.get(type(error), "openrouter")
+
+
+# live LLMの実行料金を集計する
+def _live_llm_cost_usd(events: list[Any]) -> float | None:
+    live_calls = [
+        event for event in events
+        if event.event_type == "llm_call" and not event.payload.get("dry_run", False)
+    ]
+    if not live_calls:
+        return None
+    return sum(float(event.payload.get("estimated_cost_usd", 0)) for event in live_calls)

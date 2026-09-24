@@ -49,6 +49,7 @@ from agent_eval.openrouter import (
     parse_json_response,
 )
 from agent_eval.telemetry import create_telemetry
+from tests.output import print_test_result
 
 
 # APIキー未設定の設定を作る
@@ -69,13 +70,22 @@ def _make_client(monkeypatch: pytest.MonkeyPatch, **overrides: Any) -> OpenRoute
     return OpenRouterClient(valid_settings.model)
 
 
+# OpenRouter確認結果をJSONで表示する
+def _print_openrouter_result(test: str, **values: Any) -> None:
+    print_test_result(test, "passed", **values)
+
+
 # 仮のAPIキーを拒否する
 def test_openrouter_agent_rejects_placeholder_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "replace-with-your-openrouter-api-key")
 
     with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
         OpenRouterAgent(_live_settings())
-    print("OpenRouter接続: プレースホルダーを拒否し、クライアントを生成しない")
+    _print_openrouter_result(
+        "openrouter_agent_rejects_placeholder_key",
+        rejected_reason="placeholder_api_key",
+        external_request_started=False,
+    )
 
 
 # OpenRouterタイムアウトを分類する
@@ -89,9 +99,14 @@ def test_openrouter_timeout_is_converted(monkeypatch: pytest.MonkeyPatch) -> Non
 
     client._client.chat.completions = TimeoutCompletions()
 
-    with pytest.raises(OpenRouterTimeoutError, match="max_retries=1"):
+    with pytest.raises(OpenRouterTimeoutError, match="max_retries=0"):
         client.complete("system", "user")
-    print("OpenRouter接続: タイムアウトを専用例外へ変換")
+    _print_openrouter_result(
+        "openrouter_timeout_is_converted",
+        model=client._settings.model,
+        error_category="timeout",
+        max_retries=0,
+    )
 
 
 # OpenRouterレート制限を分類する
@@ -111,7 +126,12 @@ def test_openrouter_rate_limit_is_converted(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(OpenRouterRateLimitError, match="レート制限"):
         client.complete("system", "user")
-    print("OpenRouter接続: レート制限を専用例外へ変換")
+    _print_openrouter_result(
+        "openrouter_rate_limit_is_converted",
+        model=client._settings.model,
+        error_category="rate_limit",
+        status_code=429,
+    )
 
 
 # 認証失敗の変換を確認する
@@ -128,7 +148,7 @@ def test_openrouter_auth_error_is_converted(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(OpenRouterAuthenticationError, match="認証に失敗"):
         client.complete("system", "user")
-    print("OpenRouter接続: 401認証エラーを専用例外へ変換")
+    _print_openrouter_result("openrouter_auth_error_is_converted", error_category="auth", status_code=401)
 
 
 # 認可不足の変換を確認する
@@ -145,7 +165,7 @@ def test_openrouter_permission_error_is_converted(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(OpenRouterPermissionError, match="利用権限がありません"):
         client.complete("system", "user")
-    print("OpenRouter接続: 403認可エラーを専用例外へ変換")
+    _print_openrouter_result("openrouter_permission_error_is_converted", error_category="permission", status_code=403)
 
 
 # 不正リクエストの変換を確認
@@ -162,7 +182,7 @@ def test_openrouter_bad_request_error_is_converted(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(OpenRouterBadRequestError, match="リクエスト形式エラー"):
         client.complete("system", "user")
-    print("OpenRouter接続: 400リクエスト形式エラーを専用例外へ変換")
+    _print_openrouter_result("openrouter_bad_request_error_is_converted", error_category="bad_request", status_code=400)
 
 
 # 入力文字数上限超過を確認
@@ -172,7 +192,7 @@ def test_openrouter_input_limit_error_is_converted(monkeypatch: pytest.MonkeyPat
     long_prompt = "a" * 100
     with pytest.raises(OpenRouterInputLimitError, match="上限を超過しました"):
         client.complete("system", long_prompt)
-    print("OpenRouter接続: 入力上限超過を事前検出")
+    _print_openrouter_result("openrouter_input_limit_error_is_converted", error_category="input_limit", external_request_started=False)
 
 
 # 出力上限打ち切りを検出
@@ -190,7 +210,7 @@ def test_openrouter_output_limit_error_is_converted(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(OpenRouterOutputLimitError, match="最大出力トークン数"):
         client.complete("system", "user")
-    print("OpenRouter接続: finish_reason=length による出力上限超過を検出")
+    _print_openrouter_result("openrouter_output_limit_error_is_converted", error_category="output_limit", finish_reason="length")
 
 
 # モデル未発見の変換を確認
@@ -207,7 +227,7 @@ def test_openrouter_not_found_error_is_converted(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(OpenRouterNotFoundError, match="見つからないか廃止"):
         client.complete("system", "user")
-    print("OpenRouter接続: 404モデル未発見を専用例外へ変換")
+    _print_openrouter_result("openrouter_not_found_error_is_converted", error_category="not_found", status_code=404)
 
 
 # プロバイダー障害の変換を確認
@@ -224,7 +244,7 @@ def test_openrouter_server_error_is_converted(monkeypatch: pytest.MonkeyPatch) -
 
     with pytest.raises(OpenRouterServerError, match="プロバイダー障害"):
         client.complete("system", "user")
-    print("OpenRouter接続: 500プロバイダー障害を専用例外へ変換")
+    _print_openrouter_result("openrouter_server_error_is_converted", error_category="server_error", status_code=500)
 
 
 # サービス停止の変換を確認
@@ -241,7 +261,7 @@ def test_openrouter_service_unavailable_error_is_converted(monkeypatch: pytest.M
 
     with pytest.raises(OpenRouterServiceUnavailableError, match="一時的なサービス停止"):
         client.complete("system", "user")
-    print("OpenRouter接続: 503サービス停止を専用例外へ変換")
+    _print_openrouter_result("openrouter_service_unavailable_error_is_converted", error_category="service_unavailable", status_code=503)
 
 
 # 接続障害の変換を確認する
@@ -257,7 +277,7 @@ def test_openrouter_connection_error_is_converted(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(OpenRouterConnectionError, match="接続エラー"):
         client.complete("system", "user")
-    print("OpenRouter接続: ネットワーク接続障害を専用例外へ変換")
+    _print_openrouter_result("openrouter_connection_error_is_converted", error_category="connection")
 
 
 # ストリーム切断の変換を確認
@@ -273,14 +293,14 @@ def test_openrouter_stream_disconnected_error_is_converted(monkeypatch: pytest.M
 
     with pytest.raises(OpenRouterStreamDisconnectedError, match="ストリーミング切断"):
         client.complete("system", "user")
-    print("OpenRouter接続: ストリーミング切断を専用例外へ変換")
+    _print_openrouter_result("openrouter_stream_disconnected_error_is_converted", error_category="stream_disconnected")
 
 
 # 不正JSON形式の変換を確認
 def test_openrouter_invalid_format_error_is_converted() -> None:
     with pytest.raises(OpenRouterInvalidFormatError, match="JSON"):
         parse_json_response("This is not a JSON string")
-    print("OpenRouter接続: 不正JSON文字列の解析失敗を専用例外へ変換")
+    _print_openrouter_result("openrouter_invalid_format_error_is_converted", error_category="invalid_format")
 
 
 # 空応答の検出を確認する
@@ -296,7 +316,7 @@ def test_openrouter_empty_response_error_is_converted(monkeypatch: pytest.Monkey
 
     with pytest.raises(OpenRouterEmptyResponseError, match="空のchoices"):
         client.complete("system", "user")
-    print("OpenRouter接続: 空のレスポンス受信を検出")
+    _print_openrouter_result("openrouter_empty_response_error_is_converted", error_category="empty_response")
 
 
 # 安全フィルタ拒否を検出
@@ -314,7 +334,7 @@ def test_openrouter_safety_filter_error_is_converted(monkeypatch: pytest.MonkeyP
 
     with pytest.raises(OpenRouterSafetyFilterError, match="安全フィルタ"):
         client.complete("system", "user")
-    print("OpenRouter接続: 安全フィルタによる拒否を検出")
+    _print_openrouter_result("openrouter_safety_filter_error_is_converted", error_category="safety_filter")
 
 
 # コンテンツフィルタ停止を検出
@@ -332,7 +352,7 @@ def test_openrouter_content_filter_error_is_converted(monkeypatch: pytest.Monkey
 
     with pytest.raises(OpenRouterContentFilterError, match="コンテンツフィルタ"):
         client.complete("system", "user")
-    print("OpenRouter接続: コンテンツフィルタによる中断を検出")
+    _print_openrouter_result("openrouter_content_filter_error_is_converted", error_category="content_filter")
 
 
 # ツール呼出形式不正を検出
@@ -352,7 +372,7 @@ def test_openrouter_tool_call_error_is_converted(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(OpenRouterToolCallError, match="引数JSONが不正"):
         client.complete("system", "user")
-    print("OpenRouter接続: ツール呼出引数のJSON破損を検出")
+    _print_openrouter_result("openrouter_tool_call_error_is_converted", error_category="tool_call")
 
 
 # 構造化出力の検証失敗を確認
@@ -361,7 +381,7 @@ def test_openrouter_structured_output_error_is_converted() -> None:
     invalid_data = '{"success": true}'
     with pytest.raises(OpenRouterStructuredOutputError, match="必須フィールドが欠落"):
         parse_json_response(invalid_data, schema=schema)
-    print("OpenRouter接続: スキーマ必須フィールド欠落を専用例外へ変換")
+    _print_openrouter_result("openrouter_structured_output_error_is_converted", error_category="structured_output")
 
 
 # コスト上限超過の検出を確認
@@ -380,7 +400,7 @@ def test_openrouter_cost_limit_error_is_converted(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(OpenRouterCostLimitError, match="推定コストが上限を超過"):
         client.complete("system", "user")
-    print("OpenRouter接続: 設定コスト上限超過を検出")
+    _print_openrouter_result("openrouter_cost_limit_error_is_converted", error_category="cost_limit", estimated_cost_usd=0.20, max_estimated_cost_usd=0.05)
 
 
 # 実行単位のコスト上限を確認する
@@ -407,7 +427,7 @@ def test_openrouter_run_cost_limit_is_enforced(monkeypatch: pytest.MonkeyPatch) 
         agent.run(benchmark, collector)
 
     assert collector.events()[0].payload["estimated_cost_usd"] == 0.20
-    print("OpenRouter接続: 実行コスト=0.20が上限=0.10を超過して停止")
+    _print_openrouter_result("openrouter_run_cost_limit_is_enforced", error_category="cost_limit", llm_cost_usd=0.20, max_cost_per_run_usd=0.10)
 
 
 # リトライ上限超過の検出を確認
@@ -434,7 +454,7 @@ def test_openrouter_retry_limit_error_is_converted(monkeypatch: pytest.MonkeyPat
     with pytest.raises(OpenRouterRetryLimitError, match="再試行上限に到達"):
         client.complete("system", "user")
     assert call_count == 2
-    print("OpenRouter接続: 500を2回実行後に再試行上限を記録")
+    _print_openrouter_result("openrouter_retry_limit_error_is_converted", error_category="retry_limit", status_code=500, call_count=call_count)
 
 
 # Retry-Afterを優先して再試行する
@@ -473,7 +493,7 @@ def test_openrouter_rate_limit_retries_after_header(monkeypatch: pytest.MonkeyPa
     assert response.retry_count == 1
     assert call_count == 2
     assert sleeps == [2.0]
-    print("OpenRouter接続: 429のRetry-After=2秒後に1回再試行")
+    _print_openrouter_result("openrouter_rate_limit_retries_after_header", model=client._settings.model, status_code=429, retry_after_seconds=2, retry_count=response.retry_count)
 
 
 # 冪等性モードの動作を確認
@@ -485,7 +505,7 @@ def test_openrouter_idempotency_key_is_resolved(monkeypatch: pytest.MonkeyPatch)
     invalid_client = _make_client(monkeypatch, idempotency_key_mode="none")
     assert invalid_client._resolve_idempotency_headers() == {}
 
-    print("OpenRouter接続: idempotency_key_modeに応じたヘッダー生成を確認")
+    _print_openrouter_result("openrouter_idempotency_key_is_resolved", idempotency_key_mode="per_request", header_name="X-Idempotency-Key")
 
 
 # 正常応答の取得を確認する
@@ -509,4 +529,11 @@ def test_openrouter_normal_response_succeeds(monkeypatch: pytest.MonkeyPatch) ->
     assert resp.output_tokens == 20
     assert resp.estimated_cost_usd == 0.001
     assert resp.retry_count == 0
-    print("OpenRouter接続: 正常系チャット応答と冪等性キー送信を確認")
+    _print_openrouter_result(
+        "openrouter_normal_response_succeeds",
+        model=client._settings.model,
+        input_tokens=resp.input_tokens,
+        output_tokens=resp.output_tokens,
+        llm_cost_usd=resp.estimated_cost_usd,
+        retry_count=resp.retry_count,
+    )

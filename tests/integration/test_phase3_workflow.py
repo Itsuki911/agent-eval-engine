@@ -29,6 +29,7 @@ from agent_eval.openrouter import (
 from agent_eval.workflow import EvaluationService
 from database.repositories import RunRepository
 from database.session import create_db_engine
+from tests.output import print_test_result
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -104,11 +105,38 @@ class OpenRouterFailingAgent:
         raise self._error
 
 
+# テスト用の課金済み実行器を表す
+class ChargedAgent:
+    # API料金を含む応答を再現する
+    def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
+        collector.record(
+            "llm_call",
+            {
+                "provider": "openrouter",
+                "model": "test-paid-model",
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "estimated_cost_usd": 0.0125,
+                "duration_ms": 10,
+                "dry_run": False,
+            },
+            actor="model",
+        )
+        return AgentResult({"success": True, "answer": "paid response", "dry_run": False})
+
+
 # 出力を抑えた設定を作る
 def _test_settings():
     settings = load_settings(PROJECT_ROOT / "configs" / "phase3-local.yaml")
     telemetry = settings.telemetry.model_copy(update={"exporter": "none"})
     return settings.model_copy(update={"telemetry": telemetry})
+
+
+# live相当の設定を作る
+def _live_like_settings():
+    settings = _test_settings()
+    engine = settings.engine.model_copy(update={"dry_run": False})
+    return settings.model_copy(update={"engine": engine})
 
 
 # dry-runの全処理を確認する
@@ -121,15 +149,42 @@ def test_dry_run_persists_evaluation_history(session: Session) -> None:
     assert result.status == "simulated"
     assert result.event_count >= 6
     assert history["final_state"]["dry_run"] is True
+    assert result.llm_cost_usd is None
+    assert history["llm_cost_usd"] is None
     assert [event["sequence"] for event in history["events"]] == list(range(result.event_count))
     stored_run = RunRepository(session).get_run(result.run_id)
     assert stored_run.evaluations[0].status == "simulated"
+    assert "llm_cost_usd" not in stored_run.evaluations[0].summary
     assert any(metric.name == "end_to_end_latency_ms" for metric in stored_run.metrics)
-    print(
-        "dry-run保存: "
-        f"status={result.status}, events={result.event_count}, "
-        f"metrics={len(stored_run.metrics)}, "
-        f"evaluation={stored_run.evaluations[0].status}"
+    print_test_result(
+        "dry_run_persists_evaluation_history",
+        "passed",
+        status=result.status,
+        event_count=result.event_count,
+        metric_count=len(stored_run.metrics),
+        evaluation_status=stored_run.evaluations[0].status,
+        llm_cost_usd=None,
+    )
+
+
+# API LLM料金を実行単位で保存できる
+def test_live_llm_cost_is_persisted(session: Session) -> None:
+    service = EvaluationService(_live_like_settings(), session, ChargedAgent())
+
+    result = service.run(PROJECT_ROOT / "benchmarks" / "generic" / "GEN-TOOL-001.yaml")
+    history = RunRepository(session).reconstruct_history(result.run_id)
+    stored_run = RunRepository(session).get_run(result.run_id)
+    evaluation = stored_run.evaluations[0]
+
+    assert result.llm_cost_usd == 0.0125
+    assert history["llm_cost_usd"] == 0.0125
+    assert float(stored_run.llm_cost_usd) == 0.0125
+    assert evaluation.summary["llm_cost_usd"] == 0.0125
+    print_test_result(
+        "live_llm_cost_is_persisted",
+        "passed",
+        llm_cost_usd=result.llm_cost_usd,
+        stored_in=["runs", "evaluations.summary", "reconstructed_history"],
     )
 
 
@@ -143,10 +198,12 @@ def test_model_failure_is_persisted(session: Session) -> None:
     assert result.status == "failed"
     assert history["failure_category"] == "model"
     assert any(event["event_type"] == "model_error" for event in history["events"])
-    print(
-        "失敗保存: "
-        f"status={result.status}, failure_category={history['failure_category']}, "
-        "event_type=model_error"
+    print_test_result(
+        "model_failure_is_persisted",
+        "passed",
+        status=result.status,
+        failure_category=history["failure_category"],
+        event_type="model_error",
     )
 
 
@@ -164,10 +221,14 @@ def test_timeout_is_persisted(session: Session) -> None:
     assert event["payload"]["status_code"] == 408
     assert event["payload"]["retry_count"] == 1
     assert stored_run.evaluations[0].status == "failed"
-    print(
-        "タイムアウト保存: "
-        f"status={result.status}, failure_category={history['failure_category']}, "
-        "event_type=timeout_error, status_code=408, retry_count=1"
+    print_test_result(
+        "timeout_is_persisted",
+        "passed",
+        status=result.status,
+        failure_category=history["failure_category"],
+        event_type="timeout_error",
+        status_code=event["payload"]["status_code"],
+        retry_count=event["payload"]["retry_count"],
     )
 
 
@@ -185,10 +246,14 @@ def test_rate_limit_is_persisted(session: Session) -> None:
     assert event["payload"]["status_code"] == 429
     assert event["payload"]["retry_count"] == 1
     assert stored_run.evaluations[0].status == "failed"
-    print(
-        "レート制限保存: "
-        f"status={result.status}, failure_category={history['failure_category']}, "
-        "event_type=rate_limit_error, status_code=429, retry_count=1"
+    print_test_result(
+        "rate_limit_is_persisted",
+        "passed",
+        status=result.status,
+        failure_category=history["failure_category"],
+        event_type="rate_limit_error",
+        status_code=event["payload"]["status_code"],
+        retry_count=event["payload"]["retry_count"],
     )
 
 
@@ -219,4 +284,10 @@ def test_openrouter_error_categories_are_persisted(
     assert history["failure_category"] == category
     assert any(event["event_type"] == f"{category}_error" for event in events)
     assert stored_run.evaluations[0].status == "failed"
-    print(f"例外保存: category={category}, event_type={category}_error, status={result.status}")
+    print_test_result(
+        "openrouter_error_categories_are_persisted",
+        "passed",
+        status=result.status,
+        failure_category=category,
+        event_type=f"{category}_error",
+    )
