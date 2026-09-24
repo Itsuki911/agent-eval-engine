@@ -54,6 +54,18 @@ services:
     volumes:
       - ./:/workspace
 
+  # Go CLI/TUIモック用
+  cli:
+    profiles: ["cli"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cli
+    working_dir: /workspace/apps/cli
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./:/workspace
+
   evaluator:
     build:
       context: .

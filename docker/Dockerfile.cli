@@ -1,0 +1,9 @@
+FROM golang:1.24-alpine
+
+# CLIモックを実行する
+WORKDIR /workspace/apps/cli
+
+COPY apps/cli/go.mod ./
+COPY apps/cli/*.go ./
+
+ENTRYPOINT ["go", "run", "."]
