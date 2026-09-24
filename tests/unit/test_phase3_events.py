@@ -16,3 +16,8 @@ def test_event_collector_adds_trace_context() -> None:
     assert event.sequence == 0
     assert event.trace_id is not None
     assert event.span_id is not None
+    print(
+        "追跡情報: sequence=0, "
+        f"trace_id_length={len(event.trace_id)}, "
+        f"span_id_length={len(event.span_id)}"
+    )

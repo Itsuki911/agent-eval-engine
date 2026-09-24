@@ -16,6 +16,7 @@ from agent_eval.benchmark import BenchmarkDefinition, load_benchmark
 from agent_eval.config import Phase3Settings
 from agent_eval.events import EventCollector
 from agent_eval.metrics import ComputedMetric, calculate_metrics
+from agent_eval.openrouter import OpenRouterTimeoutError
 from agent_eval.telemetry import Telemetry, create_telemetry
 from database.repositories import RunRepository
 
@@ -119,10 +120,20 @@ class EvaluationService:
         with self._telemetry.tracer.start_as_current_span("run_agent"):
             collector = state["collector"]
             collector.record("user_prompt", {"content": state["benchmark"].task.prompt}, actor="user")
-            try:
-                result = self._agent.run(state["benchmark"], collector)
-                return {"final_state": result.final_state, "failure_category": result.failure_category}
-            except Exception as error:
+        try:
+            result = self._agent.run(state["benchmark"], collector)
+            return {"final_state": result.final_state, "failure_category": result.failure_category}
+        except OpenRouterTimeoutError as error:
+            collector.record(
+                "timeout_error",
+                {"message": str(error), "source": "openrouter"},
+                error={"type": type(error).__name__, "message": str(error)},
+            )
+            return {
+                "final_state": {"success": False, "error": str(error), "dry_run": False},
+                "failure_category": "timeout",
+            }
+        except Exception as error:
                 collector.record(
                     "model_error",
                     {"message": str(error)},

@@ -6,7 +6,7 @@ param(
 )
 
 if ($Action -eq "test") {
-    & docker compose --profile engine run --rm engine pytest -q tests/unit/test_phase3_config.py tests/unit/test_phase3_events.py tests/unit/test_phase3_metrics.py tests/unit/test_phase3_openrouter.py tests/integration/test_phase3_workflow.py
+    & docker compose --profile engine run --rm engine pytest -v -s -m "not live" tests/unit/test_phase3_config.py tests/unit/test_phase3_events.py tests/unit/test_phase3_metrics.py tests/unit/test_phase3_openrouter.py tests/integration/test_phase3_workflow.py
     exit $LASTEXITCODE
 }
 

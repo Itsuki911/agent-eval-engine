@@ -28,6 +28,7 @@ class ModelSettings(BaseModel):
     base_url: HttpUrl
     api_key_env: str = Field(min_length=1)
     timeout_seconds: int = Field(gt=0)
+    max_retries: int = Field(default=1, ge=0, le=5)
     temperature: float = Field(ge=0, le=2)
 
 

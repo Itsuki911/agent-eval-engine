@@ -5,36 +5,36 @@
 実行コマンド:
 
 ```powershell
-docker compose --profile engine run --rm engine pytest -v tests/unit/test_phase3_metrics.py -k successful_run
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_metrics.py -k successful_run
 ```
 
 1. 実行コマンドを実行する。
 2. テスト名と結果を確認する。
 
-期待結果: `test_calculate_metrics_for_successful_run PASSED`と表示され、成功率、ツール成功率、コスト、遅延を算出できる。
+期待結果: 正常系。`task_success=1`、`tool_success_rate=1`、`estimated_cost_usd=0.01`、`end_to_end_latency_ms=100` が表示される。成功、ツール利用、コスト、遅延の4種類の指標を算出できる。
 
 ## UT-METRIC-002 安全違反を検出して成功判定を拒否できる（異常系）
 
 実行コマンド:
 
 ```powershell
-docker compose --profile engine run --rm engine pytest -v tests/unit/test_phase3_metrics.py -k safety_violation
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_metrics.py -k safety_violation
 ```
 
 1. 実行コマンドを実行する。
 2. テスト名と結果を確認する。
 
-期待結果: `test_safety_violation_rejects_task_success PASSED`と表示され、安全違反がある実行は成功と判定されない。
+期待結果: 異常系。`task_success=0` と `safety_violation_count=1` が表示される。タスク応答が成功でも、安全違反が1件あれば成功判定を拒否する。
 
 ## UT-METRIC-003 重複ツールと回復を計測できる（境界値）
 
 実行コマンド:
 
 ```powershell
-docker compose --profile engine run --rm engine pytest -v tests/unit/test_phase3_metrics.py -k duplicate_tools
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_metrics.py -k duplicate_tools
 ```
 
 1. 実行コマンドを実行する。
 2. テスト名と結果を確認する。
 
-期待結果: `test_duplicate_tools_and_recovery_are_measured PASSED`と表示され、重複操作1件と回復成功を計測できる。
+期待結果: 境界値。`duplicate_action_count=1`、`recovery_success=1`、`retry_count=1` が表示される。同じツール・引数の再実行を重複として数え、失敗後の成功を回復として数える。

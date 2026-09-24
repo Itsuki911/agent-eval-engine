@@ -15,6 +15,7 @@ from agent_eval.agent import AgentResult
 from agent_eval.benchmark import BenchmarkDefinition
 from agent_eval.config import load_settings
 from agent_eval.events import EventCollector
+from agent_eval.openrouter import OpenRouterTimeoutError
 from agent_eval.workflow import EvaluationService
 from database.repositories import RunRepository
 from database.session import create_db_engine
@@ -58,6 +59,13 @@ class FailingAgent:
         raise RuntimeError("simulated model failure")
 
 
+# テスト用のタイムアウト実行器を表す
+class TimeoutAgent:
+    # OpenRouterタイムアウトを再現する
+    def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
+        raise OpenRouterTimeoutError("OpenRouterの応答がタイムアウトしました")
+
+
 # 出力を抑えた設定を作る
 def _test_settings():
     settings = load_settings(PROJECT_ROOT / "configs" / "phase3-local.yaml")
@@ -79,6 +87,12 @@ def test_dry_run_persists_evaluation_history(session: Session) -> None:
     stored_run = RunRepository(session).get_run(result.run_id)
     assert stored_run.evaluations[0].status == "simulated"
     assert any(metric.name == "end_to_end_latency_ms" for metric in stored_run.metrics)
+    print(
+        "dry-run保存: "
+        f"status={result.status}, events={result.event_count}, "
+        f"metrics={len(stored_run.metrics)}, "
+        f"evaluation={stored_run.evaluations[0].status}"
+    )
 
 
 # モデル失敗を保存できる
@@ -91,3 +105,25 @@ def test_model_failure_is_persisted(session: Session) -> None:
     assert result.status == "failed"
     assert history["failure_category"] == "model"
     assert any(event["event_type"] == "model_error" for event in history["events"])
+    print(
+        "失敗保存: "
+        f"status={result.status}, failure_category={history['failure_category']}, "
+        "event_type=model_error"
+    )
+
+
+# タイムアウトをイベントへ保存できる
+def test_timeout_is_persisted(session: Session) -> None:
+    service = EvaluationService(_test_settings(), session, TimeoutAgent())
+
+    result = service.run(PROJECT_ROOT / "benchmarks" / "generic" / "GEN-TOOL-001.yaml")
+    history = RunRepository(session).reconstruct_history(result.run_id)
+
+    assert result.status == "failed"
+    assert history["failure_category"] == "timeout"
+    assert any(event["event_type"] == "timeout_error" for event in history["events"])
+    print(
+        "タイムアウト保存: "
+        f"status={result.status}, failure_category={history['failure_category']}, "
+        "event_type=timeout_error"
+    )

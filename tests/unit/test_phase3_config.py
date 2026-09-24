@@ -19,6 +19,11 @@ def test_load_phase3_settings() -> None:
     assert settings.engine.dry_run is True
     assert settings.model.provider == "openrouter"
     assert settings.model.api_key_env == "OPENROUTER_API_KEY"
+    assert settings.model.max_retries == 1
+    print(
+        "設定読込: dry_run=True, provider=openrouter, "
+        "api_key_env=OPENROUTER_API_KEY, max_retries=1"
+    )
 
 
 # プレースホルダーを拒否する
@@ -28,6 +33,7 @@ def test_placeholder_api_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> Non
 
     with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
         load_api_key(settings.model)
+    print("APIキー検証: プレースホルダーを拒否し、外部通信を開始しない")
 
 
 # benchmark検証の読込を確認する
@@ -39,6 +45,10 @@ def test_load_phase1_benchmark() -> None:
 
     assert benchmark.id == "GEN-TOOL-001"
     assert "task_success" in benchmark.evaluation.required_metrics
+    print(
+        "benchmark検証: id=GEN-TOOL-001, "
+        "required_metric=task_success"
+    )
 
 
 # 未対応の観測設定を拒否する
@@ -48,6 +58,7 @@ def test_unknown_telemetry_exporter_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="exporter"):
         Phase3Settings.model_validate(raw_settings)
+    print("観測設定検証: 未対応exporter=unknownを拒否")
 
 
 # 不正なbenchmarkを拒否する
@@ -58,3 +69,4 @@ def test_invalid_benchmark_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ValidationError):
         load_benchmark(invalid, PROJECT_ROOT / "schemas" / "benchmark.schema.json")
+    print("benchmark検証: schema_version=invalidを実行前に拒否")

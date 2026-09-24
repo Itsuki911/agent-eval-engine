@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 from agent_eval.config import ModelSettings, load_api_key
 
@@ -22,6 +22,11 @@ class ModelResponse:
     duration_ms: float
 
 
+# OpenRouter応答時間超過を表す
+class OpenRouterTimeoutError(RuntimeError):
+    pass
+
+
 # OpenRouterへ接続する
 class OpenRouterClient:
     # 接続設定を受け取る
@@ -31,19 +36,28 @@ class OpenRouterClient:
             base_url=str(settings.base_url),
             api_key=load_api_key(settings),
             timeout=settings.timeout_seconds,
+            max_retries=settings.max_retries,
         )
 
     # チャット応答を取得する
     def complete(self, system_prompt: str, user_prompt: str) -> ModelResponse:
         started_at = perf_counter()
-        completion = self._client.chat.completions.create(
-            model=self._settings.model,
-            temperature=self._settings.temperature,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._settings.model,
+                temperature=self._settings.temperature,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+        except APITimeoutError as error:
+            message = (
+                "OpenRouterの応答がタイムアウトしました。"
+                f"timeout_seconds={self._settings.timeout_seconds}, "
+                f"max_retries={self._settings.max_retries}"
+            )
+            raise OpenRouterTimeoutError(message) from error
         duration_ms = (perf_counter() - started_at) * 1000
         usage = completion.usage
         content = completion.choices[0].message.content or ""
