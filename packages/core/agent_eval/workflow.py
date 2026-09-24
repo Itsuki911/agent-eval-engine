@@ -16,7 +16,31 @@ from agent_eval.benchmark import BenchmarkDefinition, load_benchmark
 from agent_eval.config import Phase3Settings
 from agent_eval.events import EventCollector
 from agent_eval.metrics import ComputedMetric, calculate_metrics
-from agent_eval.openrouter import OpenRouterRateLimitError, OpenRouterTimeoutError
+from agent_eval.openrouter import (
+    OpenRouterAuthenticationError,
+    OpenRouterBadRequestError,
+    OpenRouterConnectionError,
+    OpenRouterContentFilterError,
+    OpenRouterCostLimitError,
+    OpenRouterEmptyResponseError,
+    OpenRouterError,
+    OpenRouterIdempotencyError,
+    OpenRouterInputLimitError,
+    OpenRouterInvalidFormatError,
+    OpenRouterNotFoundError,
+    OpenRouterOutputLimitError,
+    OpenRouterPermissionError,
+    OpenRouterRateLimitError,
+    OpenRouterResponseMismatchError,
+    OpenRouterRetryLimitError,
+    OpenRouterSafetyFilterError,
+    OpenRouterServerError,
+    OpenRouterServiceUnavailableError,
+    OpenRouterStreamDisconnectedError,
+    OpenRouterStructuredOutputError,
+    OpenRouterTimeoutError,
+    OpenRouterToolCallError,
+)
 from agent_eval.telemetry import Telemetry, create_telemetry
 from database.repositories import RunRepository
 
@@ -123,36 +147,28 @@ class EvaluationService:
         try:
             result = self._agent.run(state["benchmark"], collector)
             return {"final_state": result.final_state, "failure_category": result.failure_category}
-        except OpenRouterTimeoutError as error:
+        except OpenRouterError as error:
+            category = _map_openrouter_error_category(error)
+            event_type = f"{category}_error"
             collector.record(
-                "timeout_error",
+                event_type,
                 {"message": str(error), "source": "openrouter"},
                 error={"type": type(error).__name__, "message": str(error)},
             )
             return {
                 "final_state": {"success": False, "error": str(error), "dry_run": False},
-                "failure_category": "timeout",
-            }
-        except OpenRouterRateLimitError as error:
-            collector.record(
-                "rate_limit_error",
-                {"message": str(error), "source": "openrouter"},
-                error={"type": type(error).__name__, "message": str(error)},
-            )
-            return {
-                "final_state": {"success": False, "error": str(error), "dry_run": False},
-                "failure_category": "rate_limit",
+                "failure_category": category,
             }
         except Exception as error:
-                collector.record(
-                    "model_error",
-                    {"message": str(error)},
-                    error={"type": type(error).__name__, "message": str(error)},
-                )
-                return {
-                    "final_state": {"success": False, "error": str(error), "dry_run": False},
-                    "failure_category": "model",
-                }
+            collector.record(
+                "model_error",
+                {"message": str(error)},
+                error={"type": type(error).__name__, "message": str(error)},
+            )
+            return {
+                "final_state": {"success": False, "error": str(error), "dry_run": False},
+                "failure_category": "model",
+            }
 
     # 軌跡収集の完了を記録する
     def _collect_trajectory(self, state: EvaluationState) -> EvaluationState:
@@ -197,3 +213,32 @@ class EvaluationService:
             )
             self._repository.session.commit()
             return {}
+
+
+# OpenRouter例外を分類する
+def _map_openrouter_error_category(error: OpenRouterError) -> str:
+    category_map = {
+        OpenRouterTimeoutError: "timeout",
+        OpenRouterRateLimitError: "rate_limit",
+        OpenRouterAuthenticationError: "auth",
+        OpenRouterPermissionError: "permission",
+        OpenRouterBadRequestError: "bad_request",
+        OpenRouterInputLimitError: "input_limit",
+        OpenRouterOutputLimitError: "output_limit",
+        OpenRouterNotFoundError: "not_found",
+        OpenRouterServerError: "server_error",
+        OpenRouterServiceUnavailableError: "service_unavailable",
+        OpenRouterConnectionError: "connection",
+        OpenRouterStreamDisconnectedError: "stream_disconnected",
+        OpenRouterInvalidFormatError: "invalid_format",
+        OpenRouterEmptyResponseError: "empty_response",
+        OpenRouterSafetyFilterError: "safety_filter",
+        OpenRouterContentFilterError: "content_filter",
+        OpenRouterToolCallError: "tool_call",
+        OpenRouterStructuredOutputError: "structured_output",
+        OpenRouterCostLimitError: "cost_limit",
+        OpenRouterRetryLimitError: "retry_limit",
+        OpenRouterIdempotencyError: "idempotency",
+        OpenRouterResponseMismatchError: "response_mismatch",
+    }
+    return category_map.get(type(error), "openrouter")

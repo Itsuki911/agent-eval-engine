@@ -8,8 +8,29 @@ model:
   base_url: https://openrouter.ai/api/v1
   api_key_env: OPENROUTER_API_KEY
   timeout_seconds: 60
+  connect_timeout_seconds: 10
+  read_timeout_seconds: 60
   max_retries: 1
+  retryable_status_codes:
+    - 408
+    - 429
+    - 500
+    - 502
+    - 503
+    - 504
+  retry_backoff_initial_seconds: 1.0
+  retry_backoff_max_seconds: 10.0
+  retry_jitter: 0.2
   temperature: 0
+  max_input_tokens: 4096
+  max_prompt_chars: 16000
+  max_output_tokens: 1024
+  max_estimated_cost_usd: 0.10
+  max_cost_per_run_usd: 1.00
+  validate_structured_output: true
+  response_format: json_object
+  response_schema: null
+  idempotency_key_mode: per_request
 telemetry:
   service_name: agent-eval-engine
   exporter: console

@@ -5,12 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from agent_eval.benchmark import BenchmarkDefinition
 from agent_eval.config import Phase3Settings
 from agent_eval.events import EventCollector
-from agent_eval.openrouter import OpenRouterClient, parse_json_response
+from agent_eval.openrouter import (
+    OpenRouterClient,
+    OpenRouterStructuredOutputError,
+    parse_json_response,
+)
 
 
 # エージェント応答を表す
@@ -87,7 +91,13 @@ class OpenRouterAgent:
             },
             actor="model",
         )
-        parsed = AgentResponse.model_validate(parse_json_response(response.content))
+        json_data = parse_json_response(response.content)
+        try:
+            parsed = AgentResponse.model_validate(json_data)
+        except ValidationError as error:
+            if self._settings.model.validate_structured_output:
+                raise OpenRouterStructuredOutputError(f"構造化出力検証に失敗しました: {error}") from error
+            raise
         collector.record("model_response", {"content": response.content}, actor="model")
         return AgentResult({"success": parsed.success, "answer": parsed.final_answer, "dry_run": False})
 
