@@ -8,7 +8,7 @@ param(
 # DBスキーマを最新版へ更新する
 function Update-Phase3Database {
     Write-Host "Phase 3: checking and applying DB migrations."
-    & docker compose run --rm db-tools alembic upgrade head
+    & docker compose run --rm db-tools python scripts/migrate_database.py
     if ($LASTEXITCODE -ne 0) {
         Write-Error "DB migration failed. Evaluation will not start."
         exit $LASTEXITCODE

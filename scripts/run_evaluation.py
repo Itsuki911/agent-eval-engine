@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from typing import Any
 
 from agent_eval.config import load_settings
 from agent_eval.workflow import EvaluationService
@@ -19,13 +21,8 @@ def parse_args() -> argparse.Namespace:
 
 
 # 評価結果をJSONで表示する
-def main() -> None:
-    args = parse_args()
-    settings = load_settings(args.config)
-    session_factory = create_session_factory()
-    with session_factory() as session:
-        result = EvaluationService(settings, session).run(args.benchmark)
-    output = {
+def build_result_output(result: Any) -> dict[str, Any]:
+    output: dict[str, Any] = {
         "run_id": str(result.run_id),
         "status": result.status,
         "benchmark_id": result.benchmark_id,
@@ -35,13 +32,27 @@ def main() -> None:
     }
     if result.llm_cost_usd is not None:
         output["llm_cost_usd"] = result.llm_cost_usd
-    print(
-        json.dumps(
-            output,
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    return output
+
+
+# 最終結果を標準出力へ1件だけ出す
+def print_result_output(result: Any) -> None:
+    print(json.dumps(build_result_output(result), ensure_ascii=False))
+
+
+# 評価処理を端末から開始する
+def main() -> None:
+    args = parse_args()
+    try:
+        settings = load_settings(args.config)
+        session_factory = create_session_factory()
+        with session_factory() as session:
+            result = EvaluationService(settings, session).run(args.benchmark)
+    except Exception as error:
+        error_output = {"status": "failed", "error_type": type(error).__name__}
+        print(json.dumps(error_output, ensure_ascii=False), file=sys.stderr)
+        raise
+    print_result_output(result)
 
 
 if __name__ == "__main__":

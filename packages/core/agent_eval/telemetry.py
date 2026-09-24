@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -24,5 +25,5 @@ def create_telemetry(settings: TelemetrySettings) -> Telemetry:
     resource = Resource.create({SERVICE_NAME: settings.service_name})
     provider = TracerProvider(resource=resource)
     if settings.exporter == "console":
-        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter(out=sys.stderr)))
     return Telemetry(tracer=provider.get_tracer("agent_eval"), provider=provider)
