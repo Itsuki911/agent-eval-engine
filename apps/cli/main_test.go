@@ -256,3 +256,88 @@ func TestRenderErrorShowsBeginnerGuidance(t *testing.T) {
 		t.Errorf("missing beginner guide in error screen")
 	}
 }
+
+// 全画面で矢印選択を確認する
+func TestArrowKeysOperateAllSelectionScreens(t *testing.T) {
+	testCases := []struct {
+		name     string
+		state    appState
+		expected int
+	}{
+		{"new evaluation", appState{screen: newEvalScreen}, 1},
+		{"search", appState{screen: searchScreen}, 1},
+		{"detail", appState{screen: detailScreen}, 1},
+		{"confirm", appState{screen: confirmScreen}, 1},
+		{"error", appState{screen: errorScreen}, 1},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			next, done := nextState(testCase.state, "down")
+			if done {
+				t.Fatal("arrow key unexpectedly ended the UI")
+			}
+			indexes := []int{next.newEvalIndex, next.searchIndex, next.detailIndex, next.confirmIndex, next.errorIndex}
+			if indexes[0]+indexes[1]+indexes[2]+indexes[3]+indexes[4] != testCase.expected {
+				t.Fatalf("arrow key did not update selection: %+v", next)
+			}
+		})
+	}
+}
+
+// 選択画面から次画面へ進む
+func TestEnterOpensSelectedScreenFromAllMenus(t *testing.T) {
+	testCases := []struct {
+		name     string
+		state    appState
+		expected screenName
+	}{
+		{"new evaluation", appState{screen: newEvalScreen, newEvalIndex: 1}, confirmScreen},
+		{"search", appState{screen: searchScreen, searchIndex: 2}, runsScreen},
+		{"detail trace", appState{screen: detailScreen, detailIndex: 0}, traceScreen},
+		{"detail compare", appState{screen: detailScreen, detailIndex: 1}, compareScreen},
+		{"confirm cancel", appState{screen: confirmScreen}, newEvalScreen},
+		{"confirm live", appState{screen: confirmScreen, confirmIndex: 1}, detailScreen},
+		{"error retry", appState{screen: errorScreen, errorIndex: 1}, confirmScreen},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			next, done := nextState(testCase.state, "enter")
+			if done || next.screen != testCase.expected {
+				t.Fatalf("expected %s, got %s", testCase.expected, next.screen)
+			}
+		})
+	}
+}
+
+// 狭い端末幅で本文を折り返す
+func TestWrapContentFitsNarrowTerminal(t *testing.T) {
+	content := "評価エンジンの画面幅に応じて長い説明文を安全に折り返します。"
+	wrapped := wrapContent(content, 24)
+	for _, line := range strings.Split(wrapped, "\n") {
+		width := 0
+		for _, runeValue := range line {
+			width += displayWidth(runeValue)
+		}
+		if width > 22 {
+			t.Fatalf("line exceeds layout width: %q", line)
+		}
+	}
+}
+
+// 端末幅で区切り線を縮める
+func TestDividerForUsesTerminalWidth(t *testing.T) {
+	if got := len([]rune(dividerFor(40))); got != 38 {
+		t.Fatalf("expected 38 columns, got %d", got)
+	}
+}
+
+// raw mode向け改行を確認する
+func TestRenderUsesCarriageReturnAndLineFeed(t *testing.T) {
+	var output bytes.Buffer
+	if err := render(appState{screen: homeScreen, noClear: true}, &output); err != nil {
+		t.Fatalf("render returned error: %v", err)
+	}
+	if !strings.Contains(output.String(), "\r\n") {
+		t.Fatal("render must use CRLF for raw terminal mode")
+	}
+}

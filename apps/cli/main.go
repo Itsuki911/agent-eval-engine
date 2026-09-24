@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/term"
 )
@@ -47,7 +48,14 @@ type appState struct {
 	noClear    bool
 	homeIndex  int
 	runIndex   int
-	traceIndex int
+	traceIndex   int
+	newEvalIndex int
+	searchIndex  int
+	detailIndex  int
+	confirmIndex int
+	errorIndex   int
+	width        int
+	height       int
 }
 
 // 指定色の文字列を返す
@@ -67,8 +75,12 @@ func parseFlags() appState {
 	noClear := flag.Bool("no-clear", false, "画面消去を無効化")
 	flag.Parse()
 
+	initialScreen := screenName(*screen)
+	if *errorKind != "" {
+		initialScreen = errorScreen
+	}
 	return appState{
-		screen:     screenName(*screen),
+		screen:     initialScreen,
 		errorKind:  *errorKind,
 		noClear:    *noClear,
 		traceIndex: 2,
@@ -82,10 +94,6 @@ func render(state appState, output io.Writer) error {
 	} else {
 		fmt.Fprint(output, backgroundStyle)
 	}
-	if state.errorKind != "" {
-		state.screen = errorScreen
-	}
-
 	var content string
 	switch state.screen {
 	case homeScreen:
@@ -93,26 +101,93 @@ func render(state appState, output io.Writer) error {
 	case runsScreen:
 		content = renderRuns(state.runIndex)
 	case detailScreen:
-		content = renderDetail()
+		content = renderDetail(state.detailIndex)
 	case traceScreen:
 		content = renderTrace(state.traceIndex)
 	case compareScreen:
 		content = renderCompare()
 	case confirmScreen:
-		content = renderConfirm()
+		content = renderConfirm(state.confirmIndex)
 	case errorScreen:
-		content = renderError(state.errorKind)
+		content = renderError(state.errorKind, state.errorIndex)
 	case newEvalScreen:
-		content = renderNewEvaluation()
+		content = renderNewEvaluation(state.newEvalIndex)
 	case searchScreen:
-		content = renderSearch()
+		content = renderSearch(state.searchIndex)
 	case helpScreen:
 		content = renderHelp()
 	default:
 		return fmt.Errorf("unknown screen: %s", state.screen)
 	}
+	content = strings.ReplaceAll(content, divider, dividerFor(state.width))
+	content = wrapContent(content, state.width)
+	content = strings.ReplaceAll(content, "\n", "\r\n")
 	fmt.Fprint(output, content, resetStyle)
 	return nil
+}
+
+// 端末幅に応じた区切り線を返す
+func dividerFor(width int) string {
+	if width <= 0 {
+		width = 80
+	}
+	if width < 24 {
+		width = 24
+	}
+	if width > 80 {
+		width = 80
+	}
+	return strings.Repeat("─", width-2)
+}
+
+// ANSI色を保って本文を折り返す
+func wrapContent(content string, width int) string {
+	if width <= 0 {
+		width = 80
+	}
+	if width < 24 {
+		width = 24
+	}
+	lineWidth := width - 2
+	var result strings.Builder
+	column := 0
+	for index := 0; index < len(content); {
+		if content[index] == '\x1b' && index+1 < len(content) && content[index+1] == '[' {
+			end := index + 2
+			for end < len(content) && content[end] != 'm' {
+				end++
+			}
+			if end < len(content) {
+				result.WriteString(content[index : end+1])
+				index = end + 1
+				continue
+			}
+		}
+		runeValue, size := utf8.DecodeRuneInString(content[index:])
+		if runeValue == '\n' {
+			result.WriteRune(runeValue)
+			column = 0
+			index += size
+			continue
+		}
+		runeSize := displayWidth(runeValue)
+		if column > 0 && column+runeSize > lineWidth {
+			result.WriteByte('\n')
+			column = 0
+		}
+		result.WriteRune(runeValue)
+		column += runeSize
+		index += size
+	}
+	return result.String()
+}
+
+// 端末上の文字幅を返す
+func displayWidth(runeValue rune) int {
+	if runeValue >= 0x1100 && (runeValue <= 0x115f || runeValue >= 0x2e80) {
+		return 2
+	}
+	return 1
 }
 
 // 選択式メニュー行を作成する
@@ -164,39 +239,63 @@ func renderHome(selectedIndex int) string {
 }
 
 // 評価開始画面を作成する
-func renderNewEvaluation() string {
+func renderNewEvaluation(selectedIndex int) string {
+	options := []struct {
+		label string
+		detail string
+	}{
+		{"GEN-TOOL-001", "tool selection / record retrieval (ツール呼出・データ取得評価)"},
+		{"GEN-SEC-001", "prompt injection defense (プロンプト防御・安全性評価)"},
+	}
+	if selectedIndex < 0 || selectedIndex >= len(options) {
+		selectedIndex = 0
+	}
+	rows := make([]string, 0, len(options)*3)
+	for index, option := range options {
+		rows = append(rows, menuOption(index, selectedIndex, option.label, option.detail), "")
+	}
 	return strings.Join([]string{
 		paint(cyanStyle, "NEW EVALUATION"),
 		paint(slateStyle, "1 対象を選ぶ  ───  2 実行方法  ───  3 確認  ───  4 結果"),
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "STEP 1 / 3   評価対象を選択"),
 		"",
-		selected("▶ GEN-TOOL-001"),
-		paint(slateStyle, "  tool selection / record retrieval (ツール呼出・データ取得評価)"),
-		"",
-		paint(backgroundStyle, "  GEN-SEC-001"),
-		paint(slateStyle, "  prompt injection defense (プロンプト防御・安全性評価)"),
-		"",
+		rows[0],
+		rows[1],
+		rows[2],
+		rows[3],
 		paint(cyanStyle, divider),
 		paint(blueStyle, "↑↓ 選択     Enter 次へ     b 戻る     q 終了"),
 	}, "\n") + "\n"
 }
 
 // 実行履歴検索画面を作成する
-func renderSearch() string {
+func renderSearch(selectedIndex int) string {
+	options := []struct {
+		label string
+		detail string
+	}{
+		{"最近の実行", "直近24時間の実行履歴を表示"},
+		{"失敗した実行", "failed / error の実行だけを表示"},
+		{"benchmarkで探す", "GEN-TOOL-001などのIDから検索"},
+	}
+	if selectedIndex < 0 || selectedIndex >= len(options) {
+		selectedIndex = 0
+	}
+	rows := make([]string, 0, len(options)*3)
+	for index, option := range options {
+		rows = append(rows, menuOption(index, selectedIndex, option.label, option.detail), "")
+	}
 	return strings.Join([]string{
 		paint(cyanStyle, "SEARCH RUNS"),
 		paint(slateStyle, "保存済みの評価実行を探します"),
 		paint(cyanStyle, divider),
-		selected("▶ 最近の実行"),
-		paint(slateStyle, "  直近24時間の実行履歴を表示"),
-		"",
-		paint(backgroundStyle, "  失敗した実行"),
-		paint(slateStyle, "  failed / error の実行だけを表示"),
-		"",
-		paint(backgroundStyle, "  benchmarkで探す"),
-		paint(slateStyle, "  GEN-TOOL-001などのIDから検索"),
-		"",
+		rows[0],
+		rows[1],
+		rows[2],
+		rows[3],
+		rows[4],
+		rows[5],
 		paint(cyanStyle, divider),
 		paint(blueStyle, "↑↓ 選択     Enter 検索     b 戻る     q 終了"),
 	}, "\n") + "\n"
@@ -284,7 +383,15 @@ func renderRuns(selectedIndex int) string {
 }
 
 // 詳細画面を作成する
-func renderDetail() string {
+func renderDetail(selectedIndex int) string {
+	options := []string{"Traceで処理を見る", "実行結果を比較する", "実行一覧へ戻る"}
+	if selectedIndex < 0 || selectedIndex >= len(options) {
+		selectedIndex = 0
+	}
+	rows := make([]string, len(options))
+	for index, option := range options {
+		rows[index] = menuOption(index, selectedIndex, option, "Enterで開く")
+	}
 	return strings.Join([]string{
 		paint(cyanStyle, "SIGNAL CONSOLE  |  RUN 3c226216  /  GEN-TOOL-001"),
 		paint(greenStyle, "✓ completed"),
@@ -293,8 +400,13 @@ func renderDetail() string {
 		paint(slateStyle, "TASK SUCCESS  1.00     SAFETY SCORE  1.00     RETRY COUNT  0     TOOL CALLS  0"),
 		paint(cyanStyle, divider),
 		"Connectivity test successful.",
+		"",
+		paint(purpleStyle, "次に行う操作を選択"),
+		rows[0],
+		rows[1],
+		rows[2],
 		paint(cyanStyle, divider),
-		paint(blueStyle, "t Trace     c 比較     b 一覧へ戻る     q 終了"),
+		paint(blueStyle, "↑↓ 選択     Enter 開く     t Trace     c 比較     b 戻る     q 終了"),
 	}, "\n") + "\n"
 }
 
@@ -430,7 +542,15 @@ func renderCompare() string {
 }
 
 // live実行確認画面を作成する
-func renderConfirm() string {
+func renderConfirm(selectedIndex int) string {
+	options := []string{"Cancel (安全に中止する)", "Run live (外部APIで実行する)"}
+	if selectedIndex < 0 || selectedIndex >= len(options) {
+		selectedIndex = 0
+	}
+	rows := make([]string, len(options))
+	for index, option := range options {
+		rows[index] = menuOption(index, selectedIndex, option, "Enterで決定")
+	}
 	return strings.Join([]string{
 		paint(cyanStyle, "SIGNAL CONSOLE  |  LIVE EVALUATION / CONFIRM"),
 		paint(cyanStyle, divider),
@@ -439,24 +559,38 @@ func renderConfirm() string {
 		paint(purpleStyle, "COST LIMIT  $1.00 / run"),
 		"",
 		paint(redStyle, "! External API request and billing may occur."),
-		paint(amberStyle, "Default: Cancel  |  Type y only after checking model and cost limit."),
+		paint(amberStyle, "Default: Cancel  |  モデルと上限を確認してから選択してください。"),
 		paint(slateStyle, "※ 外部APIへの通信と課金が発生する可能性があります。内容を確認して続行してください。"),
+		"",
+		rows[0],
+		rows[1],
 		paint(cyanStyle, divider),
-		paint(blueStyle, "y 実行する(live)     n 中止する(cancel)     q 終了"),
+		paint(blueStyle, "↑↓ 選択     Enter 決定     y 実行する     n 中止する     q 終了"),
 	}, "\n") + "\n"
 }
 
 // エラー画面を作成する
-func renderError(kind string) string {
+func renderError(kind string, selectedIndex int) string {
 	title, cause, action, guide := errorContent(kind)
+	options := []string{"実行一覧へ戻る", "もう一度試す"}
+	if selectedIndex < 0 || selectedIndex >= len(options) {
+		selectedIndex = 0
+	}
+	rows := make([]string, len(options))
+	for index, option := range options {
+		rows[index] = menuOption(index, selectedIndex, option, "Enterで実行")
+	}
 	return strings.Join([]string{
 		paint(redStyle, "SIGNAL CONSOLE  |  ERROR / "+title),
 		paint(cyanStyle, divider),
 		paint(redStyle, "CAUSE   "+cause),
 		paint(amberStyle, "ACTION  "+action),
 		paint(slateStyle, "GUIDE   "+guide),
+		"",
+		rows[0],
+		rows[1],
 		paint(cyanStyle, divider),
-		paint(blueStyle, "b runsへ戻る     r retry     q 終了"),
+		paint(blueStyle, "↑↓ 選択     Enter 決定     b 戻る     r retry     q 終了"),
 	}, "\n") + "\n"
 }
 
@@ -491,7 +625,6 @@ func nextState(state appState, key string) (appState, bool) {
 	if key == "q" {
 		return state, true
 	}
-	state.errorKind = ""
 	switch key {
 	case "enter":
 		switch state.screen {
@@ -511,10 +644,34 @@ func nextState(state appState, key string) (appState, bool) {
 			}
 		case runsScreen:
 			state.screen = detailScreen
+			state.detailIndex = 0
 		case newEvalScreen:
 			state.screen = confirmScreen
+			state.confirmIndex = 0
 		case searchScreen:
 			state.screen = runsScreen
+		case detailScreen:
+			switch state.detailIndex {
+			case 0:
+				state.screen = traceScreen
+			case 1:
+				state.screen = compareScreen
+			default:
+				state.screen = runsScreen
+			}
+		case confirmScreen:
+			if state.confirmIndex == 0 {
+				state.screen = newEvalScreen
+			} else {
+				state.screen = detailScreen
+			}
+		case errorScreen:
+			if state.errorIndex == 0 {
+				state.screen = runsScreen
+			} else {
+				state.screen = confirmScreen
+				state.confirmIndex = 0
+			}
 		}
 	case "1":
 		if state.screen == homeScreen {
@@ -544,6 +701,7 @@ func nextState(state appState, key string) (appState, bool) {
 		}
 	case "d":
 		state.screen = detailScreen
+		state.detailIndex = 0
 	case "t":
 		state.screen = traceScreen
 		if state.traceIndex < 0 || state.traceIndex > 5 {
@@ -553,7 +711,8 @@ func nextState(state appState, key string) (appState, bool) {
 		state.screen = compareScreen
 	case "r":
 		if state.screen == errorScreen {
-			state.screen = runsScreen
+			state.screen = confirmScreen
+			state.confirmIndex = 0
 		} else {
 			state.screen = confirmScreen
 		}
@@ -571,6 +730,7 @@ func nextState(state appState, key string) (appState, bool) {
 		state.screen = helpScreen
 	case "y":
 		if state.screen == confirmScreen {
+			state.confirmIndex = 1
 			state.screen = detailScreen
 		}
 	case "n":
@@ -587,6 +747,21 @@ func nextState(state appState, key string) (appState, bool) {
 		if state.screen == runsScreen && state.runIndex > 0 {
 			state.runIndex--
 		}
+		if state.screen == newEvalScreen && state.newEvalIndex > 0 {
+			state.newEvalIndex--
+		}
+		if state.screen == searchScreen && state.searchIndex > 0 {
+			state.searchIndex--
+		}
+		if state.screen == detailScreen && state.detailIndex > 0 {
+			state.detailIndex--
+		}
+		if state.screen == confirmScreen && state.confirmIndex > 0 {
+			state.confirmIndex--
+		}
+		if state.screen == errorScreen && state.errorIndex > 0 {
+			state.errorIndex--
+		}
 	case "down":
 		if state.screen == homeScreen && state.homeIndex < 4 {
 			state.homeIndex++
@@ -596,6 +771,21 @@ func nextState(state appState, key string) (appState, bool) {
 		}
 		if state.screen == runsScreen && state.runIndex < 2 {
 			state.runIndex++
+		}
+		if state.screen == newEvalScreen && state.newEvalIndex < 1 {
+			state.newEvalIndex++
+		}
+		if state.screen == searchScreen && state.searchIndex < 2 {
+			state.searchIndex++
+		}
+		if state.screen == detailScreen && state.detailIndex < 2 {
+			state.detailIndex++
+		}
+		if state.screen == confirmScreen && state.confirmIndex < 1 {
+			state.confirmIndex++
+		}
+		if state.screen == errorScreen && state.errorIndex < 1 {
+			state.errorIndex++
 		}
 	}
 	return state, false
@@ -664,10 +854,20 @@ func runTerminal(state appState) error {
 	}
 	defer term.Restore(fileDescriptor, originalState)
 	reader := bufio.NewReader(os.Stdin)
+	hasRendered := false
 	for {
+		width, height, sizeErr := term.GetSize(fileDescriptor)
+		if sizeErr == nil {
+			state.width = width
+			state.height = height
+		}
+		if hasRendered {
+			state.noClear = false
+		}
 		if err := render(state, os.Stdout); err != nil {
 			return err
 		}
+		hasRendered = true
 		key, err := readKey(reader)
 		if err != nil {
 			return err
@@ -683,14 +883,6 @@ func runTerminal(state appState) error {
 // プログラムを開始する
 func main() {
 	state := parseFlags()
-	if flag.NFlag() > 0 {
-		state.noClear = true
-		if err := render(state, os.Stdout); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(2)
-		}
-		return
-	}
 	if err := runTerminal(state); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

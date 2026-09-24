@@ -1,5 +1,5 @@
 
-.PHONY: generate-phase1 validate-phase1 docker-validate-phase1 db-up db-migrate db-test db-shell phase3-dry-run phase3-test
+.PHONY: generate-phase1 validate-phase1 docker-validate-phase1 db-up db-migrate db-test db-shell phase3-dry-run phase3-test cli-build
 
 generate-phase1:
 	python scripts/generate_phase1_benchmarks.py
@@ -27,3 +27,7 @@ phase3-dry-run:
 
 phase3-test:
 	docker compose --profile engine run --rm engine pytest -q tests/unit/test_phase3_config.py tests/unit/test_phase3_metrics.py tests/integration/test_phase3_workflow.py
+
+# 本番用CLIをビルドする
+cli-build:
+	cd apps/cli && go build -o ../../bin/agent-eval .
