@@ -302,3 +302,48 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_pha
 
 期待結果: 正常系。`OpenRouter接続: idempotency_key_modeに応じたヘッダー生成を確認` と表示される。`per_request` モードで `X-Idempotency-Key` が適切に割り当てられ、`none` モードではヘッダーが付与されない。
 
+---
+
+## UT-RESIL-021 OpenRouterの429を待機後に再試行して成功できる（正常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_openrouter.py -k rate_limit_retries_after_header
+```
+
+1. 実行コマンドを実行する。
+2. 標準出力の再試行結果を確認する。
+
+期待結果: 正常系。`OpenRouter接続: 429のRetry-After=2秒後に1回再試行` と表示される。最初のHTTP 429で返された `Retry-After=2` を待機時間として使用し、合計2回のAPI呼出後に成功する。外部APIへは通信しない。
+
+---
+
+## UT-RESIL-022 OpenRouterの再試行上限到達を記録できる（異常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_openrouter.py -k retry_limit_error_is_converted
+```
+
+1. 実行コマンドを実行する。
+2. 標準出力の試行回数を確認する。
+
+期待結果: 異常系。`OpenRouter接続: 500を2回実行後に再試行上限を記録` と表示される。HTTP 500を `max_retries=1` の設定で初回と再試行の合計2回実行した後、`OpenRouterRetryLimitError` が送出される。外部APIへは通信しない。
+
+---
+
+## UT-RESIL-023 OpenRouterの実行コスト上限を超過時に停止できる（境界値・異常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_phase3_openrouter.py -k run_cost_limit_is_enforced
+```
+
+1. 実行コマンドを実行する。
+2. 標準出力のコストと上限を確認する。
+
+期待結果: 境界値・異常系。`OpenRouter接続: 実行コスト=0.20が上限=0.10を超過して停止` と表示される。モデル応答のコストを `llm_call` eventへ記録した後、`max_cost_per_run_usd=0.10` を超えた実行を `OpenRouterCostLimitError` として停止する。外部APIへは通信しない。
+

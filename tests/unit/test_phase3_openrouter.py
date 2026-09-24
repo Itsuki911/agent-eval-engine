@@ -19,7 +19,9 @@ from openai import (
 )
 
 from agent_eval.agent import OpenRouterAgent
+from agent_eval.benchmark import load_benchmark
 from agent_eval.config import Phase3Settings, load_settings
+from agent_eval.events import EventCollector
 from agent_eval.openrouter import (
     OpenRouterAuthenticationError,
     OpenRouterBadRequestError,
@@ -43,8 +45,10 @@ from agent_eval.openrouter import (
     OpenRouterTimeoutError,
     OpenRouterToolCallError,
     OpenRouterClient,
+    ModelResponse,
     parse_json_response,
 )
+from agent_eval.telemetry import create_telemetry
 
 
 # APIキー未設定の設定を作る
@@ -76,7 +80,7 @@ def test_openrouter_agent_rejects_placeholder_key(monkeypatch: pytest.MonkeyPatc
 
 # OpenRouterタイムアウトを分類する
 def test_openrouter_timeout_is_converted(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, max_retries=0)
 
     class TimeoutCompletions:
         # タイムアウトを再現する
@@ -92,7 +96,7 @@ def test_openrouter_timeout_is_converted(monkeypatch: pytest.MonkeyPatch) -> Non
 
 # OpenRouterレート制限を分類する
 def test_openrouter_rate_limit_is_converted(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, max_retries=0)
 
     class RateLimitedCompletions:
         # レート制限を再現する
@@ -242,7 +246,7 @@ def test_openrouter_service_unavailable_error_is_converted(monkeypatch: pytest.M
 
 # 接続障害の変換を確認する
 def test_openrouter_connection_error_is_converted(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, max_retries=0)
 
     class ConnectionFailCompletions:
         # 接続切断を再現する
@@ -258,7 +262,7 @@ def test_openrouter_connection_error_is_converted(monkeypatch: pytest.MonkeyPatc
 
 # ストリーム切断の変換を確認
 def test_openrouter_stream_disconnected_error_is_converted(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _make_client(monkeypatch)
+    client = _make_client(monkeypatch, max_retries=0)
 
     class StreamInterruptedCompletions:
         # ストリーム切断を再現する
@@ -379,13 +383,49 @@ def test_openrouter_cost_limit_error_is_converted(monkeypatch: pytest.MonkeyPatc
     print("OpenRouter接続: 設定コスト上限超過を検出")
 
 
+# 実行単位のコスト上限を確認する
+def test_openrouter_run_cost_limit_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _live_settings()
+    raw_settings = settings.model_dump(mode="json")
+    raw_settings["model"]["max_estimated_cost_usd"] = 0.30
+    raw_settings["model"]["max_cost_per_run_usd"] = 0.10
+    limited_settings = Phase3Settings.model_validate(raw_settings)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    agent = OpenRouterAgent(limited_settings)
+    agent._client.complete = lambda *args: ModelResponse(
+        content='{"success": true, "final_answer": "done"}',
+        input_tokens=100,
+        output_tokens=50,
+        estimated_cost_usd=0.20,
+        duration_ms=10,
+    )
+    telemetry = create_telemetry(limited_settings.telemetry)
+    collector = EventCollector(telemetry.tracer)
+    benchmark = load_benchmark("benchmarks/generic/GEN-TOOL-001.yaml", "schemas/benchmark.schema.json")
+
+    with pytest.raises(OpenRouterCostLimitError, match="実行コストが上限を超過"):
+        agent.run(benchmark, collector)
+
+    assert collector.events()[0].payload["estimated_cost_usd"] == 0.20
+    print("OpenRouter接続: 実行コスト=0.20が上限=0.10を超過して停止")
+
+
 # リトライ上限超過の検出を確認
 def test_openrouter_retry_limit_error_is_converted(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _make_client(monkeypatch, max_retries=1, retryable_status_codes=[500])
+    client = _make_client(
+        monkeypatch,
+        max_retries=1,
+        retryable_status_codes=[500],
+        retry_backoff_initial_seconds=0,
+        retry_jitter=0,
+    )
+    call_count = 0
 
     class ExhaustedRetryCompletions:
         # 再試行上限到達を再現
         def create(self, **kwargs):
+            nonlocal call_count
+            call_count += 1
             response = httpx.Response(500, request=httpx.Request("POST", "https://openrouter.ai/api/v1"))
             raise InternalServerError("server error after retries", response=response, body={})
 
@@ -393,7 +433,47 @@ def test_openrouter_retry_limit_error_is_converted(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(OpenRouterRetryLimitError, match="再試行上限に到達"):
         client.complete("system", "user")
-    print("OpenRouter接続: 再試行可能ステータスでのリトライ上限到達を検出")
+    assert call_count == 2
+    print("OpenRouter接続: 500を2回実行後に再試行上限を記録")
+
+
+# Retry-Afterを優先して再試行する
+def test_openrouter_rate_limit_retries_after_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _make_client(
+        monkeypatch,
+        max_retries=1,
+        retryable_status_codes=[429],
+        retry_backoff_initial_seconds=0,
+        retry_jitter=0,
+    )
+    call_count = 0
+    sleeps: list[float] = []
+
+    class RecoveringCompletions:
+        # 429後に正常応答を返す
+        def create(self, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                response = httpx.Response(
+                    429,
+                    headers={"Retry-After": "2"},
+                    request=httpx.Request("POST", "https://openrouter.ai/api/v1"),
+                )
+                raise RateLimitError("provider rate limited", response=response, body={})
+            msg = SimpleNamespace(content='{"success": true, "final_answer": "done"}', refusal=None)
+            choice = SimpleNamespace(message=msg, finish_reason="stop")
+            return SimpleNamespace(choices=[choice], usage=None)
+
+    monkeypatch.setattr("agent_eval.openrouter.sleep", sleeps.append)
+    client._client.chat.completions = RecoveringCompletions()
+
+    response = client.complete("system", "user")
+
+    assert response.retry_count == 1
+    assert call_count == 2
+    assert sleeps == [2.0]
+    print("OpenRouter接続: 429のRetry-After=2秒後に1回再試行")
 
 
 # 冪等性モードの動作を確認
@@ -428,4 +508,5 @@ def test_openrouter_normal_response_succeeds(monkeypatch: pytest.MonkeyPatch) ->
     assert resp.input_tokens == 10
     assert resp.output_tokens == 20
     assert resp.estimated_cost_usd == 0.001
+    assert resp.retry_count == 0
     print("OpenRouter接続: 正常系チャット応答と冪等性キー送信を確認")

@@ -15,7 +15,17 @@ from agent_eval.agent import AgentResult
 from agent_eval.benchmark import BenchmarkDefinition
 from agent_eval.config import load_settings
 from agent_eval.events import EventCollector
-from agent_eval.openrouter import OpenRouterRateLimitError, OpenRouterTimeoutError
+from agent_eval.openrouter import (
+    OpenRouterAuthenticationError,
+    OpenRouterConnectionError,
+    OpenRouterCostLimitError,
+    OpenRouterInputLimitError,
+    OpenRouterRateLimitError,
+    OpenRouterRetryLimitError,
+    OpenRouterSafetyFilterError,
+    OpenRouterStructuredOutputError,
+    OpenRouterTimeoutError,
+)
 from agent_eval.workflow import EvaluationService
 from database.repositories import RunRepository
 from database.session import create_db_engine
@@ -63,14 +73,35 @@ class FailingAgent:
 class TimeoutAgent:
     # OpenRouterタイムアウトを再現する
     def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
-        raise OpenRouterTimeoutError("OpenRouterの応答がタイムアウトしました")
+        raise OpenRouterTimeoutError(
+            "OpenRouterの応答がタイムアウトしました",
+            status_code=408,
+            retry_count=1,
+            retry_delays_seconds=[1.0],
+        )
 
 
 # テスト用のレート制限実行器を表す
 class RateLimitedAgent:
     # OpenRouterレート制限を再現する
     def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
-        raise OpenRouterRateLimitError("OpenRouterのレート制限に達しました")
+        raise OpenRouterRateLimitError(
+            "OpenRouterのレート制限に達しました",
+            status_code=429,
+            retry_count=1,
+            retry_delays_seconds=[2.0],
+        )
+
+
+# テスト用のOpenRouter失敗実行器を表す
+class OpenRouterFailingAgent:
+    # 指定された例外を再現する
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+
+    # OpenRouter例外を送出する
+    def run(self, benchmark: BenchmarkDefinition, collector: EventCollector) -> AgentResult:
+        raise self._error
 
 
 # 出力を抑えた設定を作る
@@ -125,14 +156,18 @@ def test_timeout_is_persisted(session: Session) -> None:
 
     result = service.run(PROJECT_ROOT / "benchmarks" / "generic" / "GEN-TOOL-001.yaml")
     history = RunRepository(session).reconstruct_history(result.run_id)
+    stored_run = RunRepository(session).get_run(result.run_id)
 
     assert result.status == "failed"
     assert history["failure_category"] == "timeout"
-    assert any(event["event_type"] == "timeout_error" for event in history["events"])
+    event = next(event for event in history["events"] if event["event_type"] == "timeout_error")
+    assert event["payload"]["status_code"] == 408
+    assert event["payload"]["retry_count"] == 1
+    assert stored_run.evaluations[0].status == "failed"
     print(
         "タイムアウト保存: "
         f"status={result.status}, failure_category={history['failure_category']}, "
-        "event_type=timeout_error"
+        "event_type=timeout_error, status_code=408, retry_count=1"
     )
 
 
@@ -142,12 +177,46 @@ def test_rate_limit_is_persisted(session: Session) -> None:
 
     result = service.run(PROJECT_ROOT / "benchmarks" / "generic" / "GEN-TOOL-001.yaml")
     history = RunRepository(session).reconstruct_history(result.run_id)
+    stored_run = RunRepository(session).get_run(result.run_id)
 
     assert result.status == "failed"
     assert history["failure_category"] == "rate_limit"
-    assert any(event["event_type"] == "rate_limit_error" for event in history["events"])
+    event = next(event for event in history["events"] if event["event_type"] == "rate_limit_error")
+    assert event["payload"]["status_code"] == 429
+    assert event["payload"]["retry_count"] == 1
+    assert stored_run.evaluations[0].status == "failed"
     print(
         "レート制限保存: "
         f"status={result.status}, failure_category={history['failure_category']}, "
-        "event_type=rate_limit_error"
+        "event_type=rate_limit_error, status_code=429, retry_count=1"
     )
+
+
+# 代表例外の永続化を確認する
+@pytest.mark.parametrize(
+    ("error", "category"),
+    [
+        (OpenRouterAuthenticationError("認証失敗"), "auth"),
+        (OpenRouterInputLimitError("入力上限超過"), "input_limit"),
+        (OpenRouterConnectionError("接続失敗"), "connection"),
+        (OpenRouterSafetyFilterError("安全フィルタ拒否"), "safety_filter"),
+        (OpenRouterStructuredOutputError("構造化出力不正"), "structured_output"),
+        (OpenRouterCostLimitError("コスト上限超過"), "cost_limit"),
+        (OpenRouterRetryLimitError("再試行上限"), "retry_limit"),
+    ],
+)
+def test_openrouter_error_categories_are_persisted(
+    session: Session, error: Exception, category: str
+) -> None:
+    service = EvaluationService(_test_settings(), session, OpenRouterFailingAgent(error))
+
+    result = service.run(PROJECT_ROOT / "benchmarks" / "generic" / "GEN-TOOL-001.yaml")
+    history = RunRepository(session).reconstruct_history(result.run_id)
+    stored_run = RunRepository(session).get_run(result.run_id)
+    events = history["events"]
+
+    assert result.status == "failed"
+    assert history["failure_category"] == category
+    assert any(event["event_type"] == f"{category}_error" for event in events)
+    assert stored_run.evaluations[0].status == "failed"
+    print(f"例外保存: category={category}, event_type={category}_error, status={result.status}")

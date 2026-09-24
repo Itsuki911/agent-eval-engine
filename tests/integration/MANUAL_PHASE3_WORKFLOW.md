@@ -54,7 +54,7 @@ docker compose --profile engine run --rm engine pytest -v -s tests/integration/t
 1. 実行コマンドを実行する。
 2. `タイムアウト保存:` から始まる結果を確認する。
 
-期待結果: 異常系。`status=failed`、`failure_category=timeout`、`event_type=timeout_error` が表示される。タイムアウトは未分類の例外ではなく、DBのイベント・失敗分類・評価結果として保存される。外部APIへは通信しない。
+期待結果: 異常系。`status=failed`、`failure_category=timeout`、`event_type=timeout_error`、`status_code=408`、`retry_count=1` が表示される。タイムアウトは未分類の例外ではなく、HTTP状態・再試行回数とともにDBのイベント・失敗分類・評価結果として保存される。外部APIへは通信しない。
 
 ## IT-WORKFLOW-005 OpenRouterのレート制限を失敗履歴として保存できる（異常系）
 
@@ -67,4 +67,17 @@ docker compose --profile engine run --rm engine pytest -v -s tests/integration/t
 1. 実行コマンドを実行する。
 2. `レート制限保存:` から始まる結果を確認する。
 
-期待結果: 異常系。`status=failed`、`failure_category=rate_limit`、`event_type=rate_limit_error` が表示される。HTTP 429のレート制限は、未分類の例外ではなくDBのイベント・失敗分類・評価結果として保存される。外部APIへは通信しない。
+期待結果: 異常系。`status=failed`、`failure_category=rate_limit`、`event_type=rate_limit_error`、`status_code=429`、`retry_count=1` が表示される。HTTP 429のレート制限は、未分類の例外ではなくHTTP状態・再試行回数とともにDBのイベント・失敗分類・評価結果として保存される。外部APIへは通信しない。
+
+## IT-WORKFLOW-006 OpenRouter代表例外を分類して履歴へ保存できる（異常系）
+
+実行コマンド:
+
+```powershell
+docker compose --profile engine run --rm engine pytest -v -s tests/integration/test_phase3_workflow.py -k openrouter_error_categories_are_persisted
+```
+
+1. 実行コマンドを実行する。
+2. 各 `例外保存:` の出力を確認する。
+
+期待結果: 異常系。`auth`、`input_limit`、`connection`、`safety_filter`、`structured_output`、`cost_limit`、`retry_limit` の各分類について、`status=failed` と対応する `{分類}_error` eventが表示される。各例外のevents・failure_category・evaluationがテストDBへ保存される。外部APIへは通信しない。

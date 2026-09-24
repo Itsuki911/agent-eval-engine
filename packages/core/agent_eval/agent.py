@@ -12,6 +12,7 @@ from agent_eval.config import Phase3Settings
 from agent_eval.events import EventCollector
 from agent_eval.openrouter import (
     OpenRouterClient,
+    OpenRouterCostLimitError,
     OpenRouterStructuredOutputError,
     parse_json_response,
 )
@@ -87,10 +88,18 @@ class OpenRouterAgent:
                 "output_tokens": response.output_tokens,
                 "estimated_cost_usd": response.estimated_cost_usd,
                 "duration_ms": response.duration_ms,
+                "retry_count": response.retry_count,
                 "dry_run": False,
             },
             actor="model",
         )
+        if (
+            self._settings.model.max_cost_per_run_usd is not None
+            and response.estimated_cost_usd > self._settings.model.max_cost_per_run_usd
+        ):
+            raise OpenRouterCostLimitError(
+                "実行コストが上限を超過しました"
+            )
         json_data = parse_json_response(response.content)
         try:
             parsed = AgentResponse.model_validate(json_data)

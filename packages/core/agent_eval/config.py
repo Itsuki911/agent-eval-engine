@@ -36,7 +36,7 @@ class ModelSettings(BaseModel):
     )
     retry_backoff_initial_seconds: float = Field(default=1.0, ge=0)
     retry_backoff_max_seconds: float = Field(default=10.0, ge=0)
-    retry_jitter: float | bool = Field(default=0.2)
+    retry_jitter: float = Field(default=0.2, ge=0)
     temperature: float = Field(ge=0, le=2)
     max_input_tokens: int | None = Field(default=None, gt=0)
     max_prompt_chars: int | None = Field(default=None, gt=0)

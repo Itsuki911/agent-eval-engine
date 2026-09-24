@@ -31,7 +31,6 @@ from agent_eval.openrouter import (
     OpenRouterOutputLimitError,
     OpenRouterPermissionError,
     OpenRouterRateLimitError,
-    OpenRouterResponseMismatchError,
     OpenRouterRetryLimitError,
     OpenRouterSafetyFilterError,
     OpenRouterServerError,
@@ -152,7 +151,13 @@ class EvaluationService:
             event_type = f"{category}_error"
             collector.record(
                 event_type,
-                {"message": str(error), "source": "openrouter"},
+                {
+                    "message": str(error),
+                    "source": "openrouter",
+                    "status_code": error.status_code,
+                    "retry_count": error.retry_count,
+                    "retry_delays_seconds": error.retry_delays_seconds,
+                },
                 error={"type": type(error).__name__, "message": str(error)},
             )
             return {
@@ -239,6 +244,5 @@ def _map_openrouter_error_category(error: OpenRouterError) -> str:
         OpenRouterCostLimitError: "cost_limit",
         OpenRouterRetryLimitError: "retry_limit",
         OpenRouterIdempotencyError: "idempotency",
-        OpenRouterResponseMismatchError: "response_mismatch",
     }
     return category_map.get(type(error), "openrouter")
