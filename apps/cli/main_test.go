@@ -341,3 +341,13 @@ func TestRenderUsesCarriageReturnAndLineFeed(t *testing.T) {
 		t.Fatal("render must use CRLF for raw terminal mode")
 	}
 }
+
+// 代替画面バッファを確認する
+func TestAlternateScreenSequencesAreDefined(t *testing.T) {
+	if !strings.Contains(alternateScreenStart, "?1049h") {
+		t.Fatal("alternate screen start sequence is missing")
+	}
+	if !strings.Contains(alternateScreenEnd, "?1049l") {
+		t.Fatal("alternate screen end sequence is missing")
+	}
+}

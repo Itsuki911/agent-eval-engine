@@ -18,6 +18,8 @@ REST APIとMCPは後続Phaseの対象です。
 
 - 対象言語を段階的に拡大する。現在のPython、Go、C、Bash、PowerShell、TypeScriptに加え、評価対象となるagentや利用環境に応じて言語・実行環境を追加する。
 - 各言語のworkspaceタスクレベルを段階的に向上する。Phase 1の自己完結した小規模タスクを基準に、複数ファイル、設定、依存関係、API互換性、並行処理、実リポジトリ由来のissue解決へ拡張する。
+- TUIの「新しい評価を開始する」から、既存benchmarkの選択に加えて、利用者がbenchmarkを入力形式で作成・保存できるようにする。初期対応は`generic`と`coding`に限定し、現在用意しているbenchmarkは作成例として扱う。作成画面は現在のYAML schemaと項目（`title`、`expected`、`evaluation`など）を変更せず、必須項目の入力・検証後に追加する。利用者が作成・利用した評価データセットはローカルへ保存し、後から選択・再利用できるようにする。分類や対応領域は後続Phaseで拡張する。
+- 保存済みの評価データをCSV形式で出力し、ExcelやGoogle Sheetsで利用できるようにする。出力ファイルは利用者のローカルダウンロード先へ保存する。
 
 ## Phase 2: PostgreSQL永続化基盤
 

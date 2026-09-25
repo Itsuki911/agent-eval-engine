@@ -39,6 +39,9 @@ const (
 	resetStyle      = "\033[0m"
 
 	divider = "────────────────────────────────────────────────────────────────────────"
+
+	alternateScreenStart = "\033[?1049h\033[2J\033[H"
+	alternateScreenEnd   = "\033[?1049l"
 )
 
 // UI状態を保持する
@@ -853,6 +856,8 @@ func runTerminal(state appState) error {
 		return err
 	}
 	defer term.Restore(fileDescriptor, originalState)
+	fmt.Fprint(os.Stdout, alternateScreenStart)
+	defer fmt.Fprint(os.Stdout, resetStyle, alternateScreenEnd)
 	reader := bufio.NewReader(os.Stdin)
 	hasRendered := false
 	for {
