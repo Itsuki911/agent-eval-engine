@@ -9,7 +9,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from database.base import Base
-from database.models import Evaluation, Event, Metric, Run  # noqa: F401
+from database.models import AgentTarget, Artifact, Evaluation, Event, Metric, Run, RunAgentExecution  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

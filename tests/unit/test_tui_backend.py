@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
+
+import pytest
+import yaml
 
 from agent_eval.events import CollectedEvent
 from agent_eval.workflow import EvaluationResult
 from scripts import tui_backend
+from agent_eval.benchmark import get_benchmark_template
+from agent_eval.sample_package import build_sample_package
 
 
 # 進捗イベントをJSON Linesへ変換する
@@ -89,6 +95,49 @@ def test_list_benchmarks_filters_by_id() -> None:
     assert output["benchmarks"]
     assert all(row["id"].startswith("GEN-TOOL") for row in output["benchmarks"])
     print(json.dumps({"test": "benchmark_filter", "total": output["total"], "query": "GEN-TOOL"}))
+
+
+# TUI入力値を自作benchmarkとして保存する
+def test_execute_create_benchmark_saves_complete_form(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_EVAL_DATA_DIR", str(tmp_path))
+    data = get_benchmark_template("generic")
+    data["id"] = "GEN-TUI-001"
+    data["title"] = "TUI入力保存"
+    data["limits"] = {"max_steps": 7, "timeout_seconds": 12.5, "max_estimated_cost_usd": 0.0}
+    data["metadata"]["source"] = "user-created"
+
+    output = tui_backend.execute_create_benchmark(SimpleNamespace(data=json.dumps(data)))
+    saved = yaml.safe_load((tmp_path / "datasets" / "user" / "generic" / "GEN-TUI-001.yaml").read_text(encoding="utf-8"))
+
+    assert output["source"] == "user-created"
+    assert output["fixture"] == "generic/data-processing-v1"
+    assert saved["limits"]["max_steps"] == 7
+    assert saved["limits"]["max_estimated_cost_usd"] == 0.0
+    print(json.dumps({"test": "tui_create", "id": output["id"], "max_steps": 7}))
+
+
+# 存在しないfixtureを保存前に拒否する
+def test_execute_create_benchmark_rejects_unknown_fixture(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_EVAL_DATA_DIR", str(tmp_path))
+    data = get_benchmark_template("generic")
+    data["id"] = "GEN-TUI-002"
+    data["fixture"] = "generic/unknown-v1"
+
+    with pytest.raises(ValueError, match="fixtureが見つかりません"):
+        tui_backend.execute_create_benchmark(SimpleNamespace(data=json.dumps(data)))
+    print(json.dumps({"test": "tui_fixture", "rejected": True}))
+
+
+# TUI境界からsampleを導入する
+def test_execute_install_sample_uses_local_data_root(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_EVAL_DATA_DIR", str(tmp_path / "data"))
+    package = build_sample_package(Path(__file__).resolve().parents[2], tmp_path / "samples.zip")
+
+    output = tui_backend.execute_install_sample(SimpleNamespace(package=str(package)))
+
+    assert output["status"] == "installed"
+    assert (tmp_path / "data" / "datasets" / "samples" / "phase1-samples-v1" / "manifest.json").is_file()
+    print(json.dumps({"test": "tui_sample_install", "status": output["status"]}))
 
 
 # 比較指標の差分を作る

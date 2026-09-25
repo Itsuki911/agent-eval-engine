@@ -71,10 +71,13 @@ type backendResult struct {
 
 // benchmark候補の値を表す
 type backendBenchmark struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Family string `json:"family"`
-	Path   string `json:"path"`
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Family  string `json:"family"`
+	Path    string `json:"path"`
+	Source  string `json:"source"`
+	Status  string `json:"status"`
+	Fixture string `json:"fixture"`
 }
 
 // Python進捗イベントを表す
@@ -217,8 +220,8 @@ func (client backendClient) showRun(ctx context.Context, runID string, eventLimi
 }
 
 // benchmark候補を取得する
-func (client backendClient) listBenchmarks(ctx context.Context, family string, query string, limit int, offset int) ([]backendBenchmark, int, error) {
-	args := []string{"list-benchmarks", "--family", family, "--limit", fmt.Sprint(limit), "--offset", fmt.Sprint(offset)}
+func (client backendClient) listBenchmarks(ctx context.Context, family string, query string, source string, limit int, offset int) ([]backendBenchmark, int, error) {
+	args := []string{"list-benchmarks", "--family", family, "--source", source, "--limit", fmt.Sprint(limit), "--offset", fmt.Sprint(offset)}
 	if query != "" {
 		args = append(args, "--query", query)
 	}
@@ -258,6 +261,60 @@ func (client backendClient) run(ctx context.Context, benchmark string, onProgres
 	var response backendRunResult
 	if err := json.Unmarshal(output, &response); err != nil {
 		return backendRunResult{}, err
+	}
+	return response, nil
+}
+
+// 評価データをCSV形式で出力する
+func (client backendClient) exportCSV(ctx context.Context, runID string) (string, error) {
+	args := []string{"export-csv"}
+	if runID != "" {
+		args = append(args, "--run-id", runID)
+	}
+	output, err := client.execute(ctx, args, nil)
+	if err != nil {
+		return "", err
+	}
+	var response struct {
+		Status      string `json:"status"`
+		Path        string `json:"path"`
+		DisplayPath string `json:"display_path"`
+	}
+	if err := json.Unmarshal(output, &response); err != nil {
+		return "", err
+	}
+	if response.DisplayPath != "" {
+		return response.DisplayPath, nil
+	}
+	return response.Path, nil
+}
+
+// benchmark作成例テンプレートを取得する
+func (client backendClient) getTemplate(ctx context.Context, family string) (map[string]any, error) {
+	output, err := client.execute(ctx, []string{"get-template", "--family", family}, nil)
+	if err != nil {
+		return nil, err
+	}
+	var template map[string]any
+	if err := json.Unmarshal(output, &template); err != nil {
+		return nil, err
+	}
+	return template, nil
+}
+
+// 利用者作成benchmarkを保存する
+func (client backendClient) createBenchmark(ctx context.Context, data map[string]any) (backendBenchmark, error) {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return backendBenchmark{}, err
+	}
+	output, err := client.execute(ctx, []string{"create-benchmark", "--data", string(payload)}, nil)
+	if err != nil {
+		return backendBenchmark{}, err
+	}
+	var response backendBenchmark
+	if err := json.Unmarshal(output, &response); err != nil {
+		return backendBenchmark{}, err
 	}
 	return response, nil
 }

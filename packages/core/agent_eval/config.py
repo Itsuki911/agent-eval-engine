@@ -47,6 +47,8 @@ class ModelSettings(BaseModel):
     response_format: str | dict[str, Any] | None = None
     response_schema: dict[str, Any] | None = None
     idempotency_key_mode: Literal["none", "per_run", "per_request"] = "per_request"
+    max_concurrency: int = Field(default=5, ge=1)
+    requests_per_minute: int | None = Field(default=None, ge=1)
 
 
 # 観測設定を表す

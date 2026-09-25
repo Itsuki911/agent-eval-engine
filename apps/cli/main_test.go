@@ -351,3 +351,235 @@ func TestAlternateScreenSequencesAreDefined(t *testing.T) {
 		t.Fatal("alternate screen end sequence is missing")
 	}
 }
+
+// Benchmark作成画面の描画を確認する
+func TestCreateBenchmarkScreenRendersProperly(t *testing.T) {
+	state := appState{
+		screen:       createBenchmarkScreen,
+		createFamily: "generic",
+		createID:     "GEN-USER-001",
+		createTitle:  "テスト用評価",
+		noClear:      true,
+	}
+	var output bytes.Buffer
+	if err := render(state, &output); err != nil {
+		t.Fatalf("render returned error: %v", err)
+	}
+	for _, expected := range []string{"BENCHMARK CREATOR", "Family (領域)", "GEN-USER-001", "テスト用評価"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("missing expected text in render: %s", expected)
+		}
+	}
+}
+
+// ホームおよび新規評価画面から作成画面へのキー遷移を確認する
+func TestCreateBenchmarkKeyTransitions(t *testing.T) {
+	// ホームから 'c' で作成画面へ
+	fromHome, _ := nextState(appState{screen: homeScreen}, "c")
+	if fromHome.screen != createBenchmarkScreen {
+		t.Fatalf("expected createBenchmarkScreen from home 'c', got %s", fromHome.screen)
+	}
+
+	// 新規評価から 'c' で作成画面へ
+	fromNewEval, _ := nextState(appState{screen: newEvalScreen}, "c")
+	if fromNewEval.screen != createBenchmarkScreen {
+		t.Fatalf("expected createBenchmarkScreen from newEval 'c', got %s", fromNewEval.screen)
+	}
+
+	// 作成画面で 'space' を押すと generic <-> coding が切り替わる
+	toggled, _ := nextState(appState{screen: createBenchmarkScreen, createField: 0, createFamily: "generic"}, " ")
+	if toggled.createFamily != "coding" {
+		t.Fatalf("expected coding after space, got %s", toggled.createFamily)
+	}
+}
+
+// 作成フォームの全項目を描画する
+func TestCreateBenchmarkScreenShowsLimitsAndPrompt(t *testing.T) {
+	state := appState{
+		screen: createBenchmarkScreen, createFamily: "generic", createID: "GEN-FORM-001",
+		createTitle: "入力確認", createPrompt: "一行目\n二行目", createMaxSteps: "8", createTimeout: "30", createMaxCost: "0.05",
+	}
+	output := renderCreateBenchmark(state)
+	for _, expected := range []string{"Fixture", "成功条件", "最大ステップ", "制限時間（秒）", "最大料金（USD）", "一行目 ↵ 二行目"} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("missing create field: %s", expected)
+		}
+	}
+}
+
+// 作成フォームへ日本語を入力する
+func TestCreateBenchmarkAcceptsUnicodeInput(t *testing.T) {
+	state := appState{screen: createBenchmarkScreen, createField: 2, createInputMode: true}
+	state, _ = nextState(state, "評価")
+	state, _ = nextState(state, "タイトル")
+	state, _ = nextState(state, "enter")
+	if state.createTitle != "評価タイトル" || state.createInputMode {
+		t.Fatalf("unicode input was not saved: %#v", state)
+	}
+}
+
+// 指示プロンプトを複数行で入力する
+func TestCreateBenchmarkAcceptsMultilinePrompt(t *testing.T) {
+	state := appState{screen: createBenchmarkScreen, createField: 5, createInputMode: true}
+	state, _ = nextState(state, "一行目")
+	state, _ = nextState(state, "enter")
+	state, _ = nextState(state, "二行目")
+	state, _ = nextState(state, "ctrl+s")
+	if state.createPrompt != "一行目\n二行目" || state.createInputMode {
+		t.Fatalf("multiline prompt was not saved: %#v", state)
+	}
+}
+
+// 作成フォームの上限値をYAML値へ変換する
+func TestCreateBenchmarkDataIncludesLimits(t *testing.T) {
+	state := appState{
+		createFamily: "coding", createID: "COD-FORM-001", createTitle: "上限確認", createCategory: "bug_fix",
+		createFixture: "coding/bash-workspace-v1", createPrompt: "修正してください", createSuccess: "verification_command_exit_code",
+		createFailure: "modified_forbidden_path", createNetwork: "disabled", createTags: "bash,security", createMetrics: "task_success,test_success",
+		createMaxSteps: "40", createTimeout: "300", createMaxCost: "1.25", createStatus: "active",
+	}
+	data, err := createBenchmarkData(state)
+	if err != nil {
+		t.Fatalf("createBenchmarkData returned error: %v", err)
+	}
+	limits := data["limits"].(map[string]any)
+	if limits["max_steps"] != 40 || limits["timeout_seconds"] != 300.0 || limits["max_estimated_cost_usd"] != 1.25 {
+		t.Fatalf("unexpected limits: %#v", limits)
+	}
+	if data["status"] != "active" || data["constraints"].(map[string]any)["network"] != "disabled" {
+		t.Fatalf("unexpected advanced data: %#v", data)
+	}
+}
+
+// 不正な上限値を保存前に拒否する
+func TestCreateBenchmarkDataRejectsInvalidLimits(t *testing.T) {
+	state := appState{createID: "GEN-FORM-001", createTitle: "不正値", createPrompt: "確認", createMaxSteps: "invalid", createTimeout: "60", createMaxCost: "0.1"}
+	if _, err := createBenchmarkData(state); err == nil {
+		t.Fatal("invalid max steps must be rejected")
+	}
+}
+
+// 評価一覧でsampleと自作を切り替える
+func TestBenchmarkSourceFilterCycles(t *testing.T) {
+	state := appState{screen: newEvalScreen, backend: true, benchmarkSource: "all"}
+	state, _ = nextState(state, "s")
+	if state.benchmarkSource != "sample" {
+		t.Fatalf("expected sample source, got %s", state.benchmarkSource)
+	}
+	state, _ = nextState(state, "s")
+	if state.benchmarkSource != "user-created" {
+		t.Fatalf("expected user-created source, got %s", state.benchmarkSource)
+	}
+}
+
+// UTF-8文字を一文字単位で読む
+func TestReadKeyReadsUnicodeRune(t *testing.T) {
+	reader := bufio.NewReader(strings.NewReader("評価"))
+	first, err := readKey(reader)
+	if err != nil || first != "評" {
+		t.Fatalf("expected first unicode rune, got %q / %v", first, err)
+	}
+	second, err := readKey(reader)
+	if err != nil || second != "価" {
+		t.Fatalf("expected second unicode rune, got %q / %v", second, err)
+	}
+}
+
+// Escキーで入力解除と終了を検証する
+func TestCreateBenchmarkEscapeExitsInputMode(t *testing.T) {
+	state := appState{screen: createBenchmarkScreen, createField: 5, createInputMode: true}
+	afterEsc, done := nextState(state, "escape")
+	if done || afterEsc.createInputMode {
+		t.Fatalf("expected input mode exited after escape: %#v", afterEsc)
+	}
+	afterQuit, quitDone := nextState(afterEsc, "q")
+	if !quitDone {
+		t.Fatal("expected quit after exiting input mode")
+	}
+	_ = afterQuit
+}
+
+// TabとShift+Tabの項目移動を検証する
+func TestCreateBenchmarkTabAndBacktabNavigate(t *testing.T) {
+	state := appState{screen: createBenchmarkScreen, createField: 5, createInputMode: true}
+	afterTab, _ := nextState(state, "tab")
+	if afterTab.createInputMode || afterTab.createField != 6 {
+		t.Fatalf("expected createField 6 without inputMode: %#v", afterTab)
+	}
+	afterBacktab, _ := nextState(afterTab, "backtab")
+	if afterBacktab.createField != 5 {
+		t.Fatalf("expected createField 5 after backtab: %#v", afterBacktab)
+	}
+}
+
+// マウスでフォーカスと解除を検証する
+func TestCreateBenchmarkMouseClickFocusAndBlur(t *testing.T) {
+	state := appState{screen: createBenchmarkScreen, createField: 0, createInputMode: false}
+	focused, _ := nextState(state, "mouse:click:10:19")
+	if focused.createField != 5 || !focused.createInputMode {
+		t.Fatalf("expected prompt focused on click: %#v", focused)
+	}
+	blurred, _ := nextState(focused, "mouse:click:10:4")
+	if blurred.createField != 0 || blurred.createInputMode {
+		t.Fatalf("expected choice field focused without inputMode: %#v", blurred)
+	}
+	outside, _ := nextState(focused, "mouse:click:10:1")
+	if outside.createInputMode {
+		t.Fatal("expected inputMode blurred when clicking outside")
+	}
+}
+
+// 入力中でもCtrl+Cで終了を検証する
+func TestCreateBenchmarkCtrlCTerminates(t *testing.T) {
+	state := appState{screen: createBenchmarkScreen, createField: 5, createInputMode: true}
+	_, done := nextState(state, "ctrl+c")
+	if !done {
+		t.Fatal("ctrl+c must terminate application even in input mode")
+	}
+}
+
+// 入力中の明確なUI表示を検証する
+func TestRenderCreateBenchmarkInputModeUI(t *testing.T) {
+	activeState := appState{
+		screen: createBenchmarkScreen, createField: 5, createInputMode: true,
+		createPrompt: "テストプロンプト",
+	}
+	activeOutput := renderCreateBenchmark(activeState)
+	for _, expected := range []string{"[ ✎", "[Esc] 確定・脱出", "[Tab] 次の項目", "[Shift+Tab] 前の項目", "[Ctrl+C] 終了"} {
+		if !strings.Contains(activeOutput, expected) {
+			t.Fatalf("missing active input UI element: %s", expected)
+		}
+	}
+	normalState := appState{screen: createBenchmarkScreen, createField: 5, createInputMode: false}
+	normalOutput := renderCreateBenchmark(normalState)
+	if strings.Contains(normalOutput, "[ ✎") {
+		t.Fatal("normal UI should not contain active edit marker")
+	}
+}
+
+// 拡張キーとマウス入力を検証する
+func TestReadKeyParsesTabAndEscapeAndMouse(t *testing.T) {
+	tabReader := bufio.NewReader(strings.NewReader("\t"))
+	k1, err1 := readKey(tabReader)
+	if err1 != nil || k1 != "tab" {
+		t.Fatalf("expected tab, got %s / %v", k1, err1)
+	}
+
+	escReader := bufio.NewReader(strings.NewReader("\x1b"))
+	k2, err2 := readKey(escReader)
+	if err2 != nil || k2 != "escape" {
+		t.Fatalf("expected escape, got %s / %v", k2, err2)
+	}
+
+	backtabReader := bufio.NewReader(strings.NewReader("\x1b[Z"))
+	k3, err3 := readKey(backtabReader)
+	if err3 != nil || k3 != "backtab" {
+		t.Fatalf("expected backtab, got %s / %v", k3, err3)
+	}
+
+	mouseReader := bufio.NewReader(strings.NewReader("\x1b[<0;15;8M"))
+	k4, err4 := readKey(mouseReader)
+	if err4 != nil || k4 != "mouse:click:15:8" {
+		t.Fatalf("expected mouse:click:15:8, got %s / %v", k4, err4)
+	}
+}

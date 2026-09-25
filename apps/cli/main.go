@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/term"
@@ -18,16 +20,17 @@ import (
 type screenName string
 
 const (
-	homeScreen    screenName = "home"
-	runsScreen    screenName = "runs"
-	detailScreen  screenName = "detail"
-	traceScreen   screenName = "trace"
-	compareScreen screenName = "compare"
-	confirmScreen screenName = "confirm"
-	errorScreen   screenName = "error"
-	newEvalScreen screenName = "new-evaluation"
-	searchScreen  screenName = "search"
-	helpScreen    screenName = "help"
+	homeScreen            screenName = "home"
+	runsScreen            screenName = "runs"
+	detailScreen          screenName = "detail"
+	traceScreen           screenName = "trace"
+	compareScreen         screenName = "compare"
+	confirmScreen         screenName = "confirm"
+	errorScreen           screenName = "error"
+	newEvalScreen         screenName = "new-evaluation"
+	createBenchmarkScreen screenName = "create-benchmark"
+	searchScreen          screenName = "search"
+	helpScreen            screenName = "help"
 
 	backgroundStyle = "\033[38;2;192;202;245;48;2;26;27;38m"
 	cyanStyle       = "\033[38;2;125;207;255;48;2;26;27;38m"
@@ -42,43 +45,63 @@ const (
 
 	divider = "────────────────────────────────────────────────────────────────────────"
 
-	alternateScreenStart = "\033[?1049h\033[2J\033[H"
-	alternateScreenEnd   = "\033[?1049l"
+	alternateScreenStart = "\033[?1049h\033[?1000h\033[?1006h\033[2J\033[H"
+	alternateScreenEnd   = "\033[?1006l\033[?1000l\033[?1049l"
 )
 
 // UI状態を保持する
 type appState struct {
-	screen     screenName
-	errorKind  string
-	noClear    bool
-	homeIndex  int
-	runIndex   int
-	traceIndex   int
-	newEvalIndex int
-	searchIndex  int
-	detailIndex  int
-	confirmIndex int
-	errorIndex   int
-	width        int
-	height       int
-	backend      bool
-	runs         []backendRun
-	runTotal     int
-	runOffset    int
-	detail       *backendDetail
-	benchmarks   []backendBenchmark
+	screen           screenName
+	errorKind        string
+	noClear          bool
+	homeIndex        int
+	runIndex         int
+	traceIndex       int
+	newEvalIndex     int
+	searchIndex      int
+	detailIndex      int
+	confirmIndex     int
+	errorIndex       int
+	width            int
+	height           int
+	backend          bool
+	runs             []backendRun
+	runTotal         int
+	runOffset        int
+	detail           *backendDetail
+	benchmarks       []backendBenchmark
 	benchmarkTotal   int
 	benchmarkOffset  int
 	benchmarkFamily  string
+	benchmarkSource  string
 	benchmarkQuery   string
 	filterInput      bool
-	comparison   *backendComparison
+	comparison       *backendComparison
 	comparisonOffset int
-	progress     []backendProgress
-	traceOffset  int
-	running      bool
-	cancelling   bool
-	backendError string
+	progress         []backendProgress
+	traceOffset      int
+	running          bool
+	cancelling       bool
+	backendError     string
+	exportMessage    string
+	createFamily     string
+	createID         string
+	createTitle      string
+	createCategory   string
+	createFixture    string
+	createPrompt     string
+	createSuccess    string
+	createFailure    string
+	createNetwork    string
+	createTags       string
+	createMetrics    string
+	createMaxSteps   string
+	createTimeout    string
+	createMaxCost    string
+	createStatus     string
+	createField      int
+	createError      string
+	createInputMode  bool
 }
 
 // 指定色の文字列を返す
@@ -104,12 +127,28 @@ func parseFlags() appState {
 		initialScreen = errorScreen
 	}
 	return appState{
-		screen:     initialScreen,
-		errorKind:  *errorKind,
-		noClear:    *noClear,
-		traceIndex: 2,
-		backend:    *backend,
+		screen:          initialScreen,
+		errorKind:       *errorKind,
+		noClear:         *noClear,
+		traceIndex:      2,
+		backend:         *backend,
 		benchmarkFamily: "all",
+		benchmarkSource: "all",
+		createFamily:    "generic",
+		createID:        "GEN-USER-001",
+		createTitle:     "新しいGeneric評価",
+		createCategory:  "task_success",
+		createFixture:   "generic/data-processing-v1",
+		createPrompt:    "モデルへの評価プロンプトを入力してください",
+		createSuccess:   "policy_and_final_state_satisfied",
+		createFailure:   "forbidden_action_attempted",
+		createNetwork:   "disabled",
+		createTags:      "user-created",
+		createMetrics:   "task_success,step_count,latency,estimated_cost",
+		createMaxSteps:  "12",
+		createTimeout:   "60",
+		createMaxCost:   "0.10",
+		createStatus:    "draft",
 	}
 }
 
@@ -194,6 +233,8 @@ func render(state appState, output io.Writer) error {
 		} else {
 			content = renderNewEvaluation(state.newEvalIndex)
 		}
+	case createBenchmarkScreen:
+		content = renderCreateBenchmark(state)
 	case searchScreen:
 		content = renderSearch(state.searchIndex)
 	case helpScreen:
@@ -308,6 +349,7 @@ func renderHome(selectedIndex int) string {
 		paint(slateStyle, "AI Agentの評価を実行・確認するターミナルツール (Phase 4 Mockup)"),
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "何をしますか？ (メニュー番号または矢印キーで選択)"),
+		paint(greenStyle, "  [c] Benchmark作成ボタン ── 入力形式で評価を作成・保存"),
 		"",
 	}
 	for index, option := range options {
@@ -315,7 +357,7 @@ func renderHome(selectedIndex int) string {
 	}
 	lines = append(lines,
 		paint(cyanStyle, divider),
-		paint(blueStyle, "↑↓ 選択     [1-5] 番号選択     Enter 開く     ? ヘルプ     q 終了"),
+		paint(blueStyle, "↑↓ 選択     [1-5] 番号選択     c 作成     Enter 開く     ? ヘルプ     q 終了"),
 	)
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -323,7 +365,7 @@ func renderHome(selectedIndex int) string {
 // 評価開始画面を作成する
 func renderNewEvaluation(selectedIndex int) string {
 	options := []struct {
-		label string
+		label  string
 		detail string
 	}{
 		{"GEN-TOOL-001", "tool selection / record retrieval (ツール呼出・データ取得評価)"},
@@ -354,7 +396,7 @@ func renderNewEvaluation(selectedIndex int) string {
 // 実行履歴検索画面を作成する
 func renderSearch(selectedIndex int) string {
 	options := []struct {
-		label string
+		label  string
 		detail string
 	}{
 		{"最近の実行", "直近24時間の実行履歴を表示"},
@@ -494,15 +536,19 @@ func renderBackendRuns(state appState) string {
 		}
 		line := fmt.Sprintf("  %s  %s", run.Benchmark, status)
 		if index == state.runIndex {
-			line = selected("> "+run.Benchmark+"  "+run.Status)
+			line = selected("> " + run.Benchmark + "  " + run.Status)
 		}
 		rows = append(rows, line, paint(slateStyle, "    "+run.StartedAt+"  |  "+run.Model+"  |  "+cost), "")
 	}
-	return strings.Join(append([]string{
+	headerLines := []string{
 		paint(cyanStyle, "EVALUATION RESULTS"),
 		paint(slateStyle, "PostgreSQLの実行履歴 "+pageLabel(state.runOffset, len(state.runs), total)),
-		paint(cyanStyle, divider),
-	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択・ページ移動     Enter 詳細     t Trace     c 比較     r 更新     b 戻る     q 終了"))...), "\n") + "\n"
+	}
+	if state.exportMessage != "" {
+		headerLines = append(headerLines, state.exportMessage)
+	}
+	headerLines = append(headerLines, paint(cyanStyle, divider))
+	return strings.Join(append(headerLines, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択・ページ移動     Enter 詳細     t Trace     c 比較     e CSV出力     r 更新     b 戻る     q 終了"))...), "\n") + "\n"
 }
 
 // DB実行詳細を画面用に整える
@@ -526,9 +572,14 @@ func renderBackendDetail(state appState) string {
 	if len(metricLines) == 0 {
 		metricLines = append(metricLines, paint(slateStyle, "指標はまだありません。"))
 	}
-	return strings.Join(append([]string{
+	headerLines := []string{
 		paint(cyanStyle, "RUN DETAIL  |  "+detail.RunID),
 		paint(greenStyle, "status: "+status),
+	}
+	if state.exportMessage != "" {
+		headerLines = append(headerLines, state.exportMessage)
+	}
+	headerLines = append(headerLines,
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "BENCHMARK  "+detail.Benchmark),
 		paint(purpleStyle, "MODEL      "+detail.Model),
@@ -536,7 +587,8 @@ func renderBackendDetail(state appState) string {
 		paint(purpleStyle, fmt.Sprintf("EVENTS     %d", detail.EventTotal)),
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "評価指標"),
-	}, append(metricLines, paint(cyanStyle, divider), paint(blueStyle, "t Trace     c 比較     r 更新     b 一覧へ戻る     q 終了"))...), "\n") + "\n"
+	)
+	return strings.Join(append(headerLines, append(metricLines, paint(cyanStyle, divider), paint(blueStyle, "t Trace     c 比較     e CSV出力     r 更新     b 一覧へ戻る     q 終了"))...), "\n") + "\n"
 }
 
 // DBイベントを画面用に整える
@@ -568,7 +620,7 @@ func renderBackendTrace(state appState) string {
 	for eventIndex, event := range events {
 		line := fmt.Sprintf("  %03d  %s  %s", event.Sequence, event.EventType, event.Status)
 		if eventIndex == index {
-			line = selected("> "+line)
+			line = selected("> " + line)
 		} else {
 			line = paint(slateStyle, line)
 		}
@@ -637,15 +689,27 @@ func renderBackendNewEvaluation(state appState) string {
 	for index, benchmark := range state.benchmarks {
 		line := "  " + benchmark.ID + "  " + benchmark.Title
 		if index == state.newEvalIndex {
-			line = selected("> "+benchmark.ID+"  "+benchmark.Title)
+			line = selected("> " + benchmark.ID + "  " + benchmark.Title)
 		} else {
 			line = paint(backgroundStyle, line)
 		}
-		rows = append(rows, line, paint(slateStyle, "    "+benchmark.Family+"  |  "+benchmark.Path))
+		origin := benchmark.Source
+		if origin == "" {
+			origin = "sample"
+		}
+		status := benchmark.Status
+		if status == "" {
+			status = "active"
+		}
+		rows = append(rows, line, paint(slateStyle, "    "+origin+"  |  "+status+"  |  "+benchmark.Family+"  |  "+benchmark.Path))
 	}
 	filter := "all"
 	if state.benchmarkFamily != "all" {
 		filter = state.benchmarkFamily
+	}
+	source := state.benchmarkSource
+	if source == "" {
+		source = "all"
 	}
 	search := state.benchmarkQuery
 	if state.filterInput {
@@ -653,10 +717,211 @@ func renderBackendNewEvaluation(state appState) string {
 	}
 	return strings.Join(append([]string{
 		paint(cyanStyle, "NEW EVALUATION"),
-		paint(slateStyle, "候補 "+pageLabel(state.benchmarkOffset, len(state.benchmarks), state.benchmarkTotal)+"  family: "+filter),
+		paint(slateStyle, "候補 "+pageLabel(state.benchmarkOffset, len(state.benchmarks), state.benchmarkTotal)+"  family: "+filter+"  source: "+source),
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "STEP 1 / 2   benchmarkを選択  search: "+search),
-	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択・ページ移動     f family     / 検索     Enter 確認     b 戻る     q 終了"))...), "\n") + "\n"
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択・ページ移動     c 新規作成     f family     s sample/自作     / 検索     Enter 確認     b 戻る     q 終了"))...), "\n") + "\n"
+}
+
+const createSaveField = 15
+
+// 作成フォームの入力欄を返す
+func createFieldValue(state appState, field int) string {
+	values := []string{
+		state.createFamily,
+		state.createID,
+		state.createTitle,
+		state.createCategory,
+		state.createFixture,
+		state.createPrompt,
+		state.createSuccess,
+		state.createFailure,
+		state.createNetwork,
+		state.createTags,
+		state.createMetrics,
+		state.createMaxSteps,
+		state.createTimeout,
+		state.createMaxCost,
+		state.createStatus,
+	}
+	if field < 0 || field >= len(values) {
+		return ""
+	}
+	return values[field]
+}
+
+// 作成フォームの入力欄を更新する
+func setCreateFieldValue(state *appState, field int, value string) {
+	switch field {
+	case 1:
+		state.createID = value
+	case 2:
+		state.createTitle = value
+	case 5:
+		state.createPrompt = value
+	case 9:
+		state.createTags = value
+	case 10:
+		state.createMetrics = value
+	case 11:
+		state.createMaxSteps = value
+	case 12:
+		state.createTimeout = value
+	case 13:
+		state.createMaxCost = value
+	}
+}
+
+// 作成フォームの入力可否を返す
+func isCreateTextField(field int) bool {
+	return field == 1 || field == 2 || field == 5 || field == 9 || field == 10 || field == 11 || field == 12 || field == 13
+}
+
+// 選択肢を次の値へ進める
+func nextChoice(values []string, current string) string {
+	for index, value := range values {
+		if value == current {
+			return values[(index+1)%len(values)]
+		}
+	}
+	return values[0]
+}
+
+// カンマ区切りの値を分割する
+func splitCSV(value string) []string {
+	items := make([]string, 0)
+	for _, item := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(item)
+		if trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
+}
+
+// 作成フォームの値を検証する
+func validateCreateForm(state appState) error {
+	if state.createID == "" || state.createTitle == "" || state.createPrompt == "" {
+		return fmt.Errorf("ID、タイトル、指示プロンプトは必須です")
+	}
+	maxSteps, err := strconv.Atoi(state.createMaxSteps)
+	if err != nil || maxSteps < 1 {
+		return fmt.Errorf("最大ステップは整数で入力してください")
+	}
+	timeout, err := strconv.ParseFloat(state.createTimeout, 64)
+	if err != nil || timeout <= 0 {
+		return fmt.Errorf("制限時間は数値で入力してください")
+	}
+	maxCost, err := strconv.ParseFloat(state.createMaxCost, 64)
+	if err != nil || maxCost < 0 {
+		return fmt.Errorf("最大料金は数値で入力してください")
+	}
+	return nil
+}
+
+// 作成フォームを保存形式へ変換する
+func createBenchmarkData(state appState) (map[string]any, error) {
+	if err := validateCreateForm(state); err != nil {
+		return nil, err
+	}
+	maxSteps, _ := strconv.Atoi(state.createMaxSteps)
+	timeout, _ := strconv.ParseFloat(state.createTimeout, 64)
+	maxCost, _ := strconv.ParseFloat(state.createMaxCost, 64)
+	return map[string]any{
+		"schema_version": "0.1",
+		"id":             state.createID,
+		"title":          state.createTitle,
+		"family":         state.createFamily,
+		"category":       state.createCategory,
+		"tags":           append([]string{state.createFamily}, splitCSV(state.createTags)...),
+		"fixture":        state.createFixture,
+		"status":         state.createStatus,
+		"metadata": map[string]any{
+			"task_version":       1,
+			"split":              "dev",
+			"source":             "user-created",
+			"contamination_risk": "unknown",
+			"human_review":       "pending",
+		},
+		"task":        map[string]any{"prompt": state.createPrompt},
+		"constraints": map[string]any{"network": state.createNetwork},
+		"expected": map[string]any{
+			"success_conditions": []map[string]any{{"type": state.createSuccess}},
+			"failure_conditions": []map[string]any{{"type": state.createFailure}},
+		},
+		"evaluation": map[string]any{
+			"required_metrics": splitCSV(state.createMetrics),
+			"trace":            map[string]bool{"record_observations": true, "record_actions": true, "record_tool_results": true},
+		},
+		"limits": map[string]any{
+			"max_steps":              maxSteps,
+			"timeout_seconds":        timeout,
+			"max_estimated_cost_usd": maxCost,
+		},
+	}, nil
+}
+
+// benchmark新規作成画面を作成する
+func renderCreateBenchmark(state appState) string {
+	fields := []struct {
+		name  string
+		value string
+		desc  string
+	}{
+		{"Family (領域)", state.createFamily, "Spaceで generic / coding を切替"},
+		{"Benchmark ID", state.createID, "スキーマ形式: GEN-xxx-001 または COD-xxx-001"},
+		{"タイトル", state.createTitle, "評価の目的・タイトル (1文字以上)"},
+		{"カテゴリ", state.createCategory, "Spaceで評価分類を切替"},
+		{"Fixture", state.createFixture, "Spaceで実行環境を切替"},
+		{"指示プロンプト", state.createPrompt, "Agentへの評価プロンプト"},
+		{"成功条件", state.createSuccess, "Spaceで判定条件を切替"},
+		{"失敗条件", state.createFailure, "Spaceで失敗判定を切替"},
+		{"ネットワーク", state.createNetwork, "Spaceで disabled / enabled を切替"},
+		{"タグ", state.createTags, "カンマ区切りで入力"},
+		{"必須指標", state.createMetrics, "カンマ区切りで入力"},
+		{"最大ステップ", state.createMaxSteps, "1以上の整数"},
+		{"制限時間（秒）", state.createTimeout, "0より大きい数値"},
+		{"最大料金（USD）", state.createMaxCost, "0以上の数値"},
+		{"状態", state.createStatus, "Spaceで draft / active を切替"},
+		{"保存と評価開始", "ローカルに保存して評価画面へ進む", "Enterでスキーマ検証＆ローカル保存"},
+	}
+
+	rows := make([]string, 0, len(fields)*3)
+	for index, field := range fields {
+		prefix := "  "
+		value := strings.ReplaceAll(field.value, "\n", " ↵ ")
+		line := fmt.Sprintf("%-16s : %s", field.name, value)
+		if index == state.createField {
+			if state.createInputMode {
+				line = paint(cyanStyle, "▶ ") + selected(fmt.Sprintf("%-16s : [ ✎ %s █ ]", field.name, value))
+			} else {
+				prefix = "> "
+				line = selected(prefix + line)
+			}
+		} else {
+			line = paint(backgroundStyle, prefix+line)
+		}
+		rows = append(rows, line, paint(slateStyle, "    "+field.desc), "")
+	}
+
+	headerLines := []string{
+		paint(cyanStyle, "BENCHMARK CREATOR  |  新しい評価データセットを作成"),
+		paint(slateStyle, "フォーム入力から YAML の task / expected / evaluation / limits を保存します"),
+	}
+	if state.createError != "" {
+		headerLines = append(headerLines, paint(redStyle, "エラー: "+state.createError))
+	}
+	headerLines = append(headerLines, paint(cyanStyle, divider))
+
+	guide := "↑↓ 項目選択     Enter 編集/保存     Space 選択値を切替     Ctrl+S 複数行保存     b 戻る     q 終了"
+	if state.createInputMode {
+		guide = "[Esc] 確定・脱出   [Tab] 次の項目   [Shift+Tab] 前の項目   [Enter] 改行/確定   [Ctrl+C] 終了"
+	}
+
+	return strings.Join(append(headerLines, append(rows,
+		paint(cyanStyle, divider),
+		paint(blueStyle, guide),
+	)...), "\n") + "\n"
 }
 
 // backend実行確認を画面用に整える
@@ -752,6 +1017,7 @@ func refreshBackendState(state *appState, client backendClient) {
 			contextValue,
 			state.benchmarkFamily,
 			state.benchmarkQuery,
+			state.benchmarkSource,
 			pageSize(*state),
 			state.benchmarkOffset,
 		)
@@ -842,7 +1108,7 @@ func startBackendRunAsync(ctx context.Context, state *appState, client backendCl
 			return
 		}
 		updates <- runUpdate{result: &result}
-	})
+	}()
 	return updates
 }
 
@@ -1084,8 +1350,105 @@ func errorContent(kind string) (string, string, string, string) {
 	}
 }
 
+// 作成画面のマウス操作を処理する
+func handleCreateBenchmarkMouse(state appState, key string) appState {
+	parts := strings.Split(key, ":")
+	if len(parts) != 4 {
+		return state
+	}
+	y, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return state
+	}
+	headerCount := 3
+	if state.createError != "" {
+		headerCount = 4
+	}
+	fieldIndex := (y - headerCount - 1) / 3
+	if fieldIndex >= 0 && fieldIndex <= createSaveField {
+		state.createField = fieldIndex
+		if isCreateTextField(fieldIndex) {
+			state.createInputMode = true
+			state.createError = ""
+		} else {
+			state.createInputMode = false
+		}
+	} else {
+		state.createInputMode = false
+	}
+	return state
+}
+
 // キー入力で画面を更新する
 func nextState(state appState, key string) (appState, bool) {
+	if key == "ctrl+c" {
+		return state, true
+	}
+	if state.screen == createBenchmarkScreen && state.createInputMode {
+		value := createFieldValue(state, state.createField)
+		switch key {
+		case "escape":
+			state.createInputMode = false
+		case "tab":
+			state.createInputMode = false
+			if state.createField < createSaveField {
+				state.createField++
+			} else {
+				state.createField = 0
+			}
+		case "backtab":
+			state.createInputMode = false
+			if state.createField > 0 {
+				state.createField--
+			} else {
+				state.createField = createSaveField
+			}
+		case "backspace":
+			if len(value) > 0 {
+				_, size := utf8.DecodeLastRuneInString(value)
+				setCreateFieldValue(&state, state.createField, value[:len(value)-size])
+			}
+		case "ctrl+s":
+			state.createInputMode = false
+		case "ctrl+n":
+			setCreateFieldValue(&state, state.createField, value+"\n")
+		case "enter":
+			if state.createField == 5 {
+				setCreateFieldValue(&state, state.createField, value+"\n")
+			} else {
+				state.createInputMode = false
+			}
+		default:
+			if strings.HasPrefix(key, "mouse:click:") {
+				state = handleCreateBenchmarkMouse(state, key)
+			} else if key != "up" && key != "down" && key != "pageup" && key != "pagedown" {
+				setCreateFieldValue(&state, state.createField, value+key)
+			}
+		}
+		return state, false
+	}
+	if state.screen == createBenchmarkScreen && !state.createInputMode {
+		if strings.HasPrefix(key, "mouse:click:") {
+			state = handleCreateBenchmarkMouse(state, key)
+			return state, false
+		}
+		if key == "tab" {
+			if state.createField < createSaveField {
+				state.createField++
+			} else {
+				state.createField = 0
+			}
+			return state, false
+		}
+		if key == "backtab" {
+			if state.createField > 0 {
+				state.createField--
+			} else {
+				state.createField = createSaveField
+			}
+			return state, false
+		}
+	}
 	if key == "q" {
 		return state, true
 	}
@@ -1103,7 +1466,7 @@ func nextState(state appState, key string) (appState, bool) {
 		case "escape":
 			state.filterInput = false
 		default:
-			if len(key) == 1 && key >= " " {
+			if key != "up" && key != "down" && key != "pageup" && key != "pagedown" {
 				state.benchmarkQuery += key
 			}
 		}
@@ -1136,6 +1499,11 @@ func nextState(state appState, key string) (appState, bool) {
 			if !state.backend || len(state.benchmarks) > 0 {
 				state.screen = confirmScreen
 				state.confirmIndex = 0
+			}
+		case createBenchmarkScreen:
+			if isCreateTextField(state.createField) {
+				state.createInputMode = true
+				state.createError = ""
 			}
 		case searchScreen:
 			state.screen = runsScreen
@@ -1200,8 +1568,73 @@ func nextState(state appState, key string) (appState, bool) {
 			state.traceIndex = 2
 		}
 	case "c":
-		state.screen = compareScreen
-		state.comparisonOffset = 0
+		if state.screen == homeScreen || state.screen == newEvalScreen {
+			state.screen = createBenchmarkScreen
+			state.createError = ""
+		} else {
+			state.screen = compareScreen
+			state.comparisonOffset = 0
+		}
+	case " ":
+		if state.screen == createBenchmarkScreen {
+			switch state.createField {
+			case 0:
+				if state.createFamily == "generic" {
+					state.createFamily = "coding"
+					state.createID = "COD-USER-001"
+					state.createCategory = "bug_fix"
+					state.createFixture = "coding/bash-workspace-v1"
+					state.createSuccess = "verification_command_exit_code"
+					state.createMaxSteps = "40"
+					state.createTimeout = "300"
+					state.createMaxCost = "1.00"
+				} else {
+					state.createFamily = "generic"
+					state.createID = "GEN-USER-001"
+					state.createCategory = "task_success"
+					state.createFixture = "generic/data-processing-v1"
+					state.createSuccess = "policy_and_final_state_satisfied"
+					state.createMaxSteps = "12"
+					state.createTimeout = "60"
+					state.createMaxCost = "0.10"
+				}
+			case 3:
+				if state.createFamily == "coding" {
+					categories := []string{"bug_fix", "code_generation", "test_fix", "refactoring"}
+					for i, cat := range categories {
+						if cat == state.createCategory {
+							state.createCategory = categories[(i+1)%len(categories)]
+							break
+						}
+					}
+				} else {
+					categories := []string{"task_success", "tool_selection", "tool_execution", "safety", "recovery"}
+					for i, cat := range categories {
+						if cat == state.createCategory {
+							state.createCategory = categories[(i+1)%len(categories)]
+							break
+						}
+					}
+				}
+			case 4:
+				if state.createFamily == "coding" {
+					fixtures := []string{"coding/bash-workspace-v1", "coding/python-workspace-v1", "coding/go-workspace-v1", "coding/c-workspace-v1", "coding/powershell-workspace-v1", "coding/typescript-workspace-v1"}
+					state.createFixture = nextChoice(fixtures, state.createFixture)
+				} else {
+					state.createFixture = "generic/data-processing-v1"
+				}
+			case 6:
+				conditions := []string{"policy_and_final_state_satisfied", "verification_command_exit_code", "structured_output_matches"}
+				state.createSuccess = nextChoice(conditions, state.createSuccess)
+			case 7:
+				conditions := []string{"forbidden_action_attempted", "modified_forbidden_path", "verification_command_failed"}
+				state.createFailure = nextChoice(conditions, state.createFailure)
+			case 8:
+				state.createNetwork = nextChoice([]string{"disabled", "enabled"}, state.createNetwork)
+			case 14:
+				state.createStatus = nextChoice([]string{"draft", "active"}, state.createStatus)
+			}
+		}
 	case "f":
 		if state.backend && state.screen == newEvalScreen {
 			switch state.benchmarkFamily {
@@ -1211,6 +1644,19 @@ func nextState(state appState, key string) (appState, bool) {
 				state.benchmarkFamily = "coding"
 			default:
 				state.benchmarkFamily = "all"
+			}
+			state.benchmarkOffset = 0
+			state.newEvalIndex = 0
+		}
+	case "s":
+		if state.backend && state.screen == newEvalScreen {
+			switch state.benchmarkSource {
+			case "all":
+				state.benchmarkSource = "sample"
+			case "sample":
+				state.benchmarkSource = "user-created"
+			default:
+				state.benchmarkSource = "all"
 			}
 			state.benchmarkOffset = 0
 			state.newEvalIndex = 0
@@ -1227,8 +1673,12 @@ func nextState(state appState, key string) (appState, bool) {
 			state.screen = confirmScreen
 		}
 	case "e":
-		state.screen = errorScreen
-		state.errorKind = "openrouter"
+		if state.backend && (state.screen == runsScreen || state.screen == detailScreen) {
+			// CSVエクスポート処理をrunTerminalで実行するため画面遷移しない
+		} else {
+			state.screen = errorScreen
+			state.errorKind = "openrouter"
+		}
 	case "b":
 		switch state.screen {
 		case detailScreen, traceScreen, compareScreen, confirmScreen, errorScreen:
@@ -1250,6 +1700,9 @@ func nextState(state appState, key string) (appState, bool) {
 	case "up":
 		if state.screen == homeScreen && state.homeIndex > 0 {
 			state.homeIndex--
+		}
+		if state.screen == createBenchmarkScreen && state.createField > 0 {
+			state.createField--
 		}
 		if state.screen == traceScreen && state.traceIndex > 0 {
 			state.traceIndex--
@@ -1291,6 +1744,9 @@ func nextState(state appState, key string) (appState, bool) {
 	case "down":
 		if state.screen == homeScreen && state.homeIndex < 4 {
 			state.homeIndex++
+		}
+		if state.screen == createBenchmarkScreen && state.createField < createSaveField {
+			state.createField++
 		}
 		if state.screen == traceScreen && state.traceIndex < traceLimit(state)-1 {
 			state.traceIndex++
@@ -1392,6 +1848,32 @@ func benchmarkLimit(state appState) int {
 	return 2
 }
 
+// SGRマウス入力を解析する
+func parseSGRMouse(data string) string {
+	if len(data) == 0 {
+		return "escape"
+	}
+	last := data[len(data)-1]
+	if last != 'M' {
+		return "mouse:release"
+	}
+	body := data[:len(data)-1]
+	parts := strings.Split(body, ";")
+	if len(parts) < 3 {
+		return "escape"
+	}
+	btn, bErr := strconv.Atoi(parts[0])
+	x, xErr := strconv.Atoi(parts[1])
+	y, yErr := strconv.Atoi(parts[2])
+	if bErr != nil || xErr != nil || yErr != nil {
+		return "escape"
+	}
+	if btn == 0 {
+		return fmt.Sprintf("mouse:click:%d:%d", x, y)
+	}
+	return "escape"
+}
+
 // 入力バイト列を操作名へ変換する
 func readKey(reader *bufio.Reader) (string, error) {
 	first, err := reader.ReadByte()
@@ -1402,10 +1884,45 @@ func readKey(reader *bufio.Reader) (string, error) {
 		if first == '\r' || first == '\n' {
 			return "enter", nil
 		}
+		if first == '\t' || first == 9 {
+			return "tab", nil
+		}
+		if first == 3 {
+			return "ctrl+c", nil
+		}
+		if first == 19 {
+			return "ctrl+s", nil
+		}
+		if first == 14 {
+			return "ctrl+n", nil
+		}
 		if first == 8 || first == 127 {
 			return "backspace", nil
 		}
+		if first >= utf8.RuneSelf {
+			size := 2
+			if first&0xf0 == 0xe0 {
+				size = 3
+			} else if first&0xf8 == 0xf0 {
+				size = 4
+			}
+			bytes := []byte{first}
+			for index := 1; index < size; index++ {
+				next, readErr := reader.ReadByte()
+				if readErr != nil {
+					return "", readErr
+				}
+				bytes = append(bytes, next)
+			}
+			return string(bytes), nil
+		}
 		return string(first), nil
+	}
+	if reader.Buffered() == 0 {
+		time.Sleep(15 * time.Millisecond)
+		if reader.Buffered() == 0 {
+			return "escape", nil
+		}
 	}
 	second, err := reader.ReadByte()
 	if err != nil {
@@ -1414,6 +1931,23 @@ func readKey(reader *bufio.Reader) (string, error) {
 	third, err := reader.ReadByte()
 	if err != nil || second != '[' {
 		return "escape", nil
+	}
+	if third == 'Z' {
+		return "backtab", nil
+	}
+	if third == '<' {
+		var mouseBytes []byte
+		for {
+			nextByte, readErr := reader.ReadByte()
+			if readErr != nil {
+				break
+			}
+			mouseBytes = append(mouseBytes, nextByte)
+			if nextByte == 'M' || nextByte == 'm' {
+				break
+			}
+		}
+		return parseSGRMouse(string(mouseBytes)), nil
 	}
 	if third == 'A' {
 		return "up", nil
@@ -1484,6 +2018,7 @@ func needsBackendRefresh(before appState, after appState, key string) bool {
 		before.traceOffset != after.traceOffset ||
 		before.benchmarkOffset != after.benchmarkOffset ||
 		before.benchmarkFamily != after.benchmarkFamily ||
+		before.benchmarkSource != after.benchmarkSource ||
 		before.benchmarkQuery != after.benchmarkQuery ||
 		before.comparisonOffset != after.comparisonOffset
 }
@@ -1560,6 +2095,33 @@ func runTerminal(state appState) error {
 				contextValue, cancel := context.WithCancel(context.Background())
 				cancelRun = cancel
 				updates = startBackendRunAsync(contextValue, &state, *client)
+			} else if state.backend && (before.screen == runsScreen || before.screen == detailScreen) && input.key == "e" {
+				var targetRunID string
+				if before.screen == detailScreen && state.detail != nil {
+					targetRunID = state.detail.RunID
+				}
+				path, err := client.exportCSV(context.Background(), targetRunID)
+				if err != nil {
+					state.exportMessage = paint(redStyle, "CSVエクスポートに失敗しました: "+err.Error())
+				} else {
+					state.exportMessage = paint(greenStyle, "✓ CSV保存完了: "+path)
+				}
+			} else if state.backend && before.screen == createBenchmarkScreen && before.createField == createSaveField && input.key == "enter" {
+				data, formErr := createBenchmarkData(before)
+				if formErr != nil {
+					state.createError = formErr.Error()
+				} else {
+					created, err := client.createBenchmark(context.Background(), data)
+					if err != nil {
+						state.createError = err.Error()
+					} else {
+						state.createError = ""
+						state.benchmarks = []backendBenchmark{created}
+						state.newEvalIndex = 0
+						state.confirmIndex = 1
+						state.screen = confirmScreen
+					}
+				}
 			} else if needsBackendRefresh(before, state, input.key) {
 				refreshBackendState(&state, *client)
 			}

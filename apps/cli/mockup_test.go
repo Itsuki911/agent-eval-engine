@@ -40,9 +40,9 @@ func TestMockupRendersAllScreens(t *testing.T) {
 // モック選択の境界を確認する
 func TestMockupSelectionStaysWithinBounds(t *testing.T) {
 	testCases := []struct {
-		name      string
-		first     appState
-		last      appState
+		name       string
+		first      appState
+		last       appState
 		firstIndex func(appState) int
 		lastIndex  func(appState) int
 	}{

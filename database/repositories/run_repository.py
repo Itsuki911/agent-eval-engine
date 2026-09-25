@@ -9,7 +9,19 @@ from uuid import UUID
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from database.models import Evaluation, Event, Metric, Run
+from database.models import AgentTarget, Artifact, Evaluation, Event, Metric, Run, RunAgentExecution
+
+
+# 秘密情報を含む設定を拒否する
+def reject_secret_configuration(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if any(word in key.casefold() for word in ("api_key", "token", "secret", "password")):
+                raise ValueError("Agent接続先へ秘密情報を保存できません")
+            reject_secret_configuration(nested)
+    if isinstance(value, list):
+        for nested in value:
+            reject_secret_configuration(nested)
 
 
 # 実行履歴をDBへ保存する
@@ -39,6 +51,87 @@ class RunRepository:
         self.session.add(run)
         self.session.flush()
         return run
+
+    # Agent接続先を登録する
+    def create_agent_target(
+        self,
+        name: str,
+        adapter_type: str,
+        configuration: dict[str, Any] | None = None,
+        capabilities: dict[str, Any] | None = None,
+        version: str | None = None,
+    ) -> AgentTarget:
+        reject_secret_configuration(configuration or {})
+        target = AgentTarget(
+            name=name,
+            adapter_type=adapter_type,
+            configuration=configuration or {},
+            capabilities=capabilities or {},
+            version=version,
+        )
+        self.session.add(target)
+        self.session.flush()
+        return target
+
+    # Agent実行の開始情報を保存する
+    def create_agent_execution(
+        self,
+        run_id: UUID,
+        adapter_type: str,
+        target_id: UUID | None = None,
+        target_snapshot: dict[str, Any] | None = None,
+    ) -> RunAgentExecution:
+        execution = RunAgentExecution(
+            run_id=run_id,
+            target_id=target_id,
+            adapter_type=adapter_type,
+            target_snapshot=target_snapshot or {},
+        )
+        self.session.add(execution)
+        self.session.flush()
+        return execution
+
+    # Agent実行の終了情報を保存する
+    def finish_agent_execution(
+        self,
+        execution_id: UUID,
+        status: str,
+        exit_code: int | None = None,
+        error: dict[str, Any] | None = None,
+    ) -> RunAgentExecution:
+        execution = self.session.get(RunAgentExecution, execution_id)
+        if execution is None:
+            raise ValueError(f"agent execution not found: {execution_id}")
+        execution.status = status
+        execution.exit_code = exit_code
+        execution.error = error
+        execution.finished_at = datetime.now(timezone.utc)
+        self.session.flush()
+        return execution
+
+    # 成果物の参照情報を保存する
+    def add_artifact(
+        self,
+        run_id: UUID,
+        kind: str,
+        uri: str,
+        execution_id: UUID | None = None,
+        sha256: str | None = None,
+        size_bytes: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Artifact:
+        artifact = Artifact(
+            run_id=run_id,
+            execution_id=execution_id,
+            kind=kind,
+            uri=uri,
+            sha256=sha256,
+            size_bytes=size_bytes,
+            metadata_json=metadata or {},
+        )
+        self.session.add(artifact)
+        self.session.flush()
+        return artifact
 
     # 軌跡イベントを順序付きで保存する
     def add_event(
@@ -125,7 +218,7 @@ class RunRepository:
         failure_category: str | None = None,
         llm_cost_usd: float | None = None,
     ) -> Run:
-        run = self.get_run(run_id)
+        run = self.session.get(Run, run_id)
         if run is None:
             raise ValueError(f"run not found: {run_id}")
         run.status = status
@@ -145,6 +238,8 @@ class RunRepository:
                 selectinload(Run.events),
                 selectinload(Run.metrics),
                 selectinload(Run.evaluations),
+                selectinload(Run.agent_executions),
+                selectinload(Run.artifacts),
             )
         )
         return self.session.scalar(statement)
@@ -165,7 +260,12 @@ class RunRepository:
         statement = (
             select(Run)
             .where(Run.id == run_id)
-            .options(selectinload(Run.metrics), selectinload(Run.evaluations))
+            .options(
+                selectinload(Run.metrics),
+                selectinload(Run.evaluations),
+                selectinload(Run.agent_executions),
+                selectinload(Run.artifacts),
+            )
         )
         run = self.session.scalar(statement)
         if run is None:
@@ -211,6 +311,8 @@ class RunRepository:
             }
             for evaluation in run.evaluations
             ],
+            "agent_executions": [self.agent_execution_output(execution) for execution in run.agent_executions],
+            "artifacts": [self.artifact_output(artifact) for artifact in run.artifacts],
         }
 
     # 実行イベントをページ単位で取得する
@@ -245,6 +347,32 @@ class RunRepository:
             "span_id": event.span_id,
         }
 
+    # Agent実行を返却形式へ変換する
+    def agent_execution_output(self, execution: RunAgentExecution) -> dict[str, Any]:
+        return {
+            "id": str(execution.id),
+            "target_id": str(execution.target_id) if execution.target_id else None,
+            "adapter_type": execution.adapter_type,
+            "target_snapshot": execution.target_snapshot,
+            "status": execution.status,
+            "exit_code": execution.exit_code,
+            "error": execution.error,
+            "started_at": execution.started_at.isoformat(),
+            "finished_at": execution.finished_at.isoformat() if execution.finished_at else None,
+        }
+
+    # 成果物を返却形式へ変換する
+    def artifact_output(self, artifact: Artifact) -> dict[str, Any]:
+        return {
+            "id": str(artifact.id),
+            "execution_id": str(artifact.execution_id) if artifact.execution_id else None,
+            "kind": artifact.kind,
+            "uri": artifact.uri,
+            "sha256": artifact.sha256,
+            "size_bytes": artifact.size_bytes,
+            "metadata": artifact.metadata_json,
+        }
+
     # 実行履歴を再構成する
     def reconstruct_history(self, run_id: UUID) -> dict[str, Any]:
         run = self.get_run(run_id)
@@ -268,4 +396,6 @@ class RunRepository:
                 self.event_output(event)
                 for event in run.events
             ],
+            "agent_executions": [self.agent_execution_output(execution) for execution in run.agent_executions],
+            "artifacts": [self.artifact_output(artifact) for artifact in run.artifacts],
         }

@@ -81,6 +81,9 @@ services:
       AGENT_EVAL_PYTHON: python
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_eval}:${POSTGRES_PASSWORD:-local-development-password}@db:5432/${POSTGRES_DB:-agent_eval}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-replace-with-your-openrouter-api-key}
+      AGENT_EVAL_DOWNLOAD_DIR: /exports
+      AGENT_EVAL_DOWNLOAD_DISPLAY_DIR: ${AGENT_EVAL_HOST_DOWNLOAD_DIR:-./exports}
+      AGENT_EVAL_DATA_DIR: /local-data
       PYTHONPATH: /workspace:/workspace/packages/core
     depends_on:
       db:
@@ -89,6 +92,10 @@ services:
     tty: true
     volumes:
       - ./:/workspace
+      # CSVをホスト側へ保存する
+      - ${AGENT_EVAL_HOST_DOWNLOAD_DIR:-./exports}:/exports
+      # 自作datasetをホストへ保存する
+      - ${AGENT_EVAL_HOST_DATA_DIR:-./local-data}:/local-data
 
   evaluator:
     build:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -11,7 +13,7 @@ from uuid import UUID
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
-from agent_eval.agent import AgentRunner, build_agent
+from agent_eval.agent import AgentRunner, AsyncAgentRunner, build_agent, build_async_agent
 from agent_eval.benchmark import BenchmarkDefinition, load_benchmark
 from agent_eval.config import Phase3Settings
 from agent_eval.events import EventCollector
@@ -76,7 +78,7 @@ class EvaluationService:
         self,
         settings: Phase3Settings,
         session: Session,
-        agent: AgentRunner | None = None,
+        agent: AgentRunner | AsyncAgentRunner | None = None,
         event_listener: Callable[[CollectedEvent], None] | None = None,
     ) -> None:
         self._settings = settings
@@ -107,6 +109,112 @@ class EvaluationService:
             event_count=len(collector.events()),
             llm_cost_usd=llm_cost_usd,
         )
+
+    # benchmarkを非同期に評価して保存する
+    async def run_async(self, benchmark_path: str | Path) -> EvaluationResult:
+        started_at = perf_counter()
+        collector = EventCollector(self._telemetry.tracer, self._event_listener)
+        state: EvaluationState = {
+            "benchmark_path": str(benchmark_path),
+            "collector": collector,
+            "started_at": started_at,
+        }
+        run_id = None
+        try:
+            with self._telemetry.tracer.start_as_current_span("agent.run"):
+                state.update(self._load_benchmark(state))
+                state.update(self._setup_environment(state))
+                run_id = state.get("run_id")
+                state.update(await self._run_agent_async(state))
+                state.update(self._collect_trajectory(state))
+                state.update(self._evaluate(state))
+                state.update(self._persist(state))
+        except asyncio.CancelledError:
+            if run_id is not None:
+                collector.record("evaluation_cancelled", {"run_id": str(run_id)})
+                self._repository.finish_run(
+                    run_id,
+                    "cancelled",
+                    {"cancelled": True, "success": False},
+                    "cancellation",
+                    None,
+                )
+                self._repository.session.commit()
+            self._telemetry.provider.force_flush()
+            raise
+
+        elapsed_ms = (perf_counter() - started_at) * 1000
+        metrics = state["metrics"]
+        llm_cost_usd = _live_llm_cost_usd(collector.events())
+        self._telemetry.provider.force_flush()
+        return EvaluationResult(
+            run_id=state["run_id"],
+            status="simulated" if state["final_state"].get("dry_run") else "completed" if state["final_state"].get("success") else "failed",
+            benchmark_id=state["benchmark"].id,
+            final_state=state["final_state"],
+            metrics=metrics,
+            event_count=len(collector.events()),
+            llm_cost_usd=llm_cost_usd,
+        )
+
+    # 複数benchmarkを並行して評価する
+    async def run_batch_async(
+        self,
+        benchmark_paths: list[str | Path],
+        max_concurrency: int = 3,
+        on_result: Callable[[EvaluationResult], None] | None = None,
+    ) -> list[EvaluationResult]:
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _run_single(path: str | Path) -> EvaluationResult:
+            async with semaphore:
+                result = await self.run_async(path)
+                if on_result:
+                    on_result(result)
+                return result
+
+        tasks = [_run_single(path) for path in benchmark_paths]
+        return await asyncio.gather(*tasks)
+
+    # 非同期モデル実行を記録する
+    async def _run_agent_async(self, state: EvaluationState) -> EvaluationState:
+        with self._telemetry.tracer.start_as_current_span("run_agent"):
+            collector = state["collector"]
+            collector.record("user_prompt", {"content": state["benchmark"].task.prompt}, actor="user")
+        try:
+            if hasattr(self._agent, "run_async"):
+                result = await self._agent.run_async(state["benchmark"], collector)
+            else:
+                result = self._agent.run(state["benchmark"], collector)
+            return {"final_state": result.final_state, "failure_category": result.failure_category}
+        except OpenRouterError as error:
+            category = _map_openrouter_error_category(error)
+            event_type = f"{category}_error"
+            collector.record(
+                event_type,
+                {
+                    "message": str(error),
+                    "source": "openrouter",
+                    "status_code": error.status_code,
+                    "retry_count": error.retry_count,
+                    "retry_delays_seconds": error.retry_delays_seconds,
+                },
+                error={"type": type(error).__name__, "message": str(error)},
+            )
+            return {
+                "final_state": {"success": False, "error": str(error), "dry_run": False},
+                "failure_category": category,
+            }
+        except Exception as error:
+            collector.record(
+                "model_error",
+                {"message": str(error)},
+                error={"type": type(error).__name__, "message": str(error)},
+            )
+            return {
+                "final_state": {"success": False, "error": str(error), "dry_run": False},
+                "failure_category": "model",
+            }
 
     # LangGraphを組み立てる
     def _build_graph(self):

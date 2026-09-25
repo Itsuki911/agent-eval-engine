@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -232,5 +233,44 @@ func TestNeedsBackendRefreshForPageChange(t *testing.T) {
 	}
 	if needsBackendRefresh(before, before, "down") {
 		t.Fatal("selection inside a page must not refresh backend data")
+	}
+}
+
+// exportCSVのJSON応答パースを確認する
+func TestBackendExportCSVUnmarshalsResponse(t *testing.T) {
+	jsonResponse := `{"status":"exported","path":"/path/to/downloads/agent_eval_runs.csv"}`
+	var response struct {
+		Status string `json:"status"`
+		Path   string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(jsonResponse), &response); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if response.Path != "/path/to/downloads/agent_eval_runs.csv" {
+		t.Fatalf("unexpected path: %s", response.Path)
+	}
+}
+
+// createBenchmarkのJSON応答パースを確認する
+func TestBackendCreateBenchmarkUnmarshalsResponse(t *testing.T) {
+	jsonResponse := `{"status":"created","id":"GEN-USER-001","title":"カスタム評価","family":"generic","path":"benchmarks/user/generic/GEN-USER-001.yaml"}`
+	var response backendBenchmark
+	if err := json.Unmarshal([]byte(jsonResponse), &response); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if response.ID != "GEN-USER-001" || response.Family != "generic" {
+		t.Fatalf("unexpected benchmark: %+v", response)
+	}
+}
+
+// getTemplateのJSON応答パースを確認する
+func TestBackendGetTemplateUnmarshalsResponse(t *testing.T) {
+	jsonResponse := `{"schema_version":"0.1","id":"COD-USER-001","family":"coding","task":{"prompt":"test"}}`
+	var template map[string]any
+	if err := json.Unmarshal([]byte(jsonResponse), &template); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if template["family"] != "coding" || template["id"] != "COD-USER-001" {
+		t.Fatalf("unexpected template: %+v", template)
 	}
 }

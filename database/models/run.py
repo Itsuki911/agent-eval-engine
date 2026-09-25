@@ -34,3 +34,5 @@ class Run(Base):
     events: Mapped[list["Event"]] = relationship(back_populates="run", cascade="all, delete-orphan", order_by="Event.sequence")
     metrics: Mapped[list["Metric"]] = relationship(back_populates="run", cascade="all, delete-orphan")
     evaluations: Mapped[list["Evaluation"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    agent_executions: Mapped[list["RunAgentExecution"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    artifacts: Mapped[list["Artifact"]] = relationship(back_populates="run", cascade="all, delete-orphan")

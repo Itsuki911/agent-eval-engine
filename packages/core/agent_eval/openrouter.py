@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import random
 import uuid
@@ -16,6 +17,7 @@ from openai import (
     APIConnectionError,
     APIStatusError,
     APITimeoutError,
+    AsyncOpenAI,
     AuthenticationError,
     BadRequestError,
     InternalServerError,
@@ -381,6 +383,273 @@ class OpenRouterClient:
             duration_ms=duration_ms,
             retry_count=retry_count,
         )
+
+
+# 非同期レートリミッターを表す
+class AsyncRateLimiter:
+    # 接続数上限とリクエストレートを受け取る
+    def __init__(self, max_concurrency: int = 5, requests_per_minute: int | None = None) -> None:
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._rpm = requests_per_minute
+        self._lock = asyncio.Lock()
+        self._timestamps: list[float] = []
+
+    # コンテキストマネージャで獲得する
+    async def __aenter__(self) -> AsyncRateLimiter:
+        await self.acquire()
+        return self
+
+    # コンテキストマネージャで解放する
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.release()
+
+    # レート枠を獲得する
+    async def acquire(self) -> None:
+        await self._semaphore.acquire()
+        if self._rpm is not None and self._rpm > 0:
+            async with self._lock:
+                now = perf_counter()
+                self._timestamps = [t for t in self._timestamps if now - t < 60.0]
+                if len(self._timestamps) >= self._rpm:
+                    wait_time = 60.0 - (now - self._timestamps[0])
+                    if wait_time > 0:
+                        await asyncio.sleep(wait_time)
+                self._timestamps.append(perf_counter())
+
+    # レート枠を解放する
+    def release(self) -> None:
+        self._semaphore.release()
+
+
+# OpenRouterへ非同期接続する
+class AsyncOpenRouterClient:
+    # 接続設定とレート制限を受け取る
+    def __init__(self, settings: ModelSettings, rate_limiter: AsyncRateLimiter | None = None) -> None:
+        self._settings = settings
+        timeout = httpx.Timeout(
+            settings.timeout_seconds,
+            connect=settings.connect_timeout_seconds or settings.timeout_seconds,
+            read=settings.read_timeout_seconds or settings.timeout_seconds,
+        )
+        self._client = AsyncOpenAI(
+            base_url=str(settings.base_url),
+            api_key=load_api_key(settings),
+            timeout=timeout,
+            max_retries=0,
+        )
+        self._rate_limiter = rate_limiter or AsyncRateLimiter(
+            max_concurrency=settings.max_concurrency,
+            requests_per_minute=settings.requests_per_minute,
+        )
+
+    # 冪等性ヘッダーを生成する
+    def _resolve_idempotency_headers(self, key: str | None = None) -> dict[str, str]:
+        mode = self._settings.idempotency_key_mode
+        if mode == "none":
+            return {}
+        if mode in ("per_request", "per_run"):
+            header_value = key or str(uuid.uuid4())
+            return {"X-Idempotency-Key": header_value, "Idempotency-Key": header_value}
+        raise OpenRouterIdempotencyError(f"未対応のidempotency_key_modeです: {mode}")
+
+    # 入力上限を事前検証する
+    def _validate_input_limits(self, user_prompt: str) -> None:
+        if self._settings.max_prompt_chars and len(user_prompt) > self._settings.max_prompt_chars:
+            raise OpenRouterInputLimitError(
+                f"入力文字数が上限を超過しました: {len(user_prompt)} > {self._settings.max_prompt_chars}"
+            )
+        if self._settings.max_input_tokens and len(user_prompt) > self._settings.max_input_tokens * 4:
+            raise OpenRouterInputLimitError(
+                f"概算入力トークン数が上限を超過しました: model={self._settings.model}"
+            )
+
+    # 応答の整合性を検証する
+    def _validate_response_integrity(self, completion: Any) -> None:
+        if not hasattr(completion, "choices") or not completion.choices:
+            raise OpenRouterEmptyResponseError("モデルから空のchoices応答を受信しました")
+        choice = completion.choices[0]
+        content = getattr(choice.message, "content", None)
+        tool_calls = getattr(choice.message, "tool_calls", None)
+        if content is None and not tool_calls:
+            raise OpenRouterEmptyResponseError("モデルから空の本文を受信しました")
+        if getattr(choice.message, "refusal", None) or choice.finish_reason in ("safety", "sensitive"):
+            raise OpenRouterSafetyFilterError("安全フィルタによりモデル応答が拒否されました")
+        if choice.finish_reason == "content_filter":
+            raise OpenRouterContentFilterError("コンテンツフィルタによりモデル生成が中断されました")
+        if choice.finish_reason == "length":
+            raise OpenRouterOutputLimitError("最大出力トークン数に達したため生成が打ち切られました")
+        if tool_calls:
+            validate_tool_calls(tool_calls)
+
+    # 再試行対象の障害を判定する
+    def _retry_status_code(self, error: Exception) -> int | None:
+        if isinstance(error, APITimeoutError):
+            return 408
+        if isinstance(error, RateLimitError):
+            return 429
+        if isinstance(error, InternalServerError):
+            return 500
+        if isinstance(error, APIStatusError):
+            return error.status_code
+        if isinstance(error, APIConnectionError):
+            return 0
+        return None
+
+    # 再試行待機時間を計算する
+    def _retry_delay_seconds(self, error: Exception, retry_count: int) -> float:
+        response = getattr(error, "response", None)
+        retry_after = getattr(response, "headers", {}).get("retry-after") if response else None
+        if retry_after:
+            try:
+                return min(float(retry_after), self._settings.retry_backoff_max_seconds)
+            except ValueError:
+                pass
+        delay = min(
+            self._settings.retry_backoff_initial_seconds * (2**retry_count),
+            self._settings.retry_backoff_max_seconds,
+        )
+        return delay + random.uniform(0, self._settings.retry_jitter)
+
+    # API呼出を指定回数だけ再試行する
+    async def _request_completion(self, kwargs: dict[str, Any]) -> tuple[Any, int]:
+        retry_delays: list[float] = []
+        for attempt in range(self._settings.max_retries + 1):
+            try:
+                async with self._rate_limiter:
+                    completion = await self._client.chat.completions.create(**kwargs)
+                return completion, attempt
+            except (APITimeoutError, RateLimitError, InternalServerError, APIStatusError, APIConnectionError) as error:
+                status_code = self._retry_status_code(error)
+                retryable = status_code == 0 or status_code in self._settings.retryable_status_codes
+                if not retryable or attempt == self._settings.max_retries:
+                    if isinstance(error, APITimeoutError) and attempt > 0:
+                        raise OpenRouterTimeoutError(
+                            "OpenRouterの応答が再試行後もタイムアウトしました",
+                            status_code=status_code,
+                            retry_count=attempt,
+                            retry_delays_seconds=retry_delays,
+                        ) from error
+                    if isinstance(error, RateLimitError) and attempt > 0:
+                        raise OpenRouterRateLimitError(
+                            "OpenRouterのレート制限が再試行後も継続しています",
+                            status_code=status_code,
+                            retry_count=attempt,
+                            retry_delays_seconds=retry_delays,
+                        ) from error
+                    if retryable and attempt > 0:
+                        raise OpenRouterRetryLimitError(
+                            f"再試行上限に到達しました: status_code={status_code}",
+                            status_code=status_code,
+                            retry_count=attempt,
+                            retry_delays_seconds=retry_delays,
+                        ) from error
+                    raise
+                delay = self._retry_delay_seconds(error, attempt)
+                retry_delays.append(delay)
+                await asyncio.sleep(delay)
+        raise AssertionError("再試行回数の計算に失敗しました")
+
+    # チャット応答を非同期に取得する
+    async def complete(
+        self, system_prompt: str, user_prompt: str, idempotency_key: str | None = None
+    ) -> ModelResponse:
+        self._validate_input_limits(user_prompt)
+        extra_headers = self._resolve_idempotency_headers(idempotency_key)
+        started_at = perf_counter()
+        try:
+            kwargs: dict[str, Any] = {
+                "model": self._settings.model,
+                "temperature": self._settings.temperature,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            }
+            if extra_headers:
+                kwargs["extra_headers"] = extra_headers
+            if self._settings.max_output_tokens:
+                kwargs["max_tokens"] = self._settings.max_output_tokens
+            if self._settings.response_format:
+                kwargs["response_format"] = (
+                    {"type": "json_object"}
+                    if self._settings.response_format == "json_object"
+                    else self._settings.response_format
+                )
+
+            completion, retry_count = await self._request_completion(kwargs)
+        except OpenRouterRetryLimitError:
+            raise
+        except APITimeoutError as error:
+            message = (
+                "OpenRouterの応答がタイムアウトしました。"
+                f"timeout_seconds={self._settings.timeout_seconds}, "
+                f"max_retries={self._settings.max_retries}"
+            )
+            raise OpenRouterTimeoutError(message, status_code=408) from error
+        except RateLimitError as error:
+            message = (
+                "OpenRouterのレート制限に達しました。"
+                f"model={self._settings.model}, "
+                f"max_retries={self._settings.max_retries}"
+            )
+            raise OpenRouterRateLimitError(message, status_code=429) from error
+        except AuthenticationError as error:
+            message = f"OpenRouter認証に失敗しました。APIキーを確認してください: {error}"
+            raise OpenRouterAuthenticationError(message, status_code=401) from error
+        except PermissionDeniedError as error:
+            message = f"OpenRouterの利用権限がありません: model={self._settings.model}, error={error}"
+            raise OpenRouterPermissionError(message, status_code=403) from error
+        except BadRequestError as error:
+            err_msg = str(error).lower()
+            if "context" in err_msg or "token" in err_msg or "length" in err_msg:
+                raise OpenRouterInputLimitError(f"入力上限超過エラー: {error}", status_code=400) from error
+            raise OpenRouterBadRequestError(f"リクエスト形式エラー: {error}", status_code=400) from error
+        except NotFoundError as error:
+            message = f"指定モデルが見つからないか廃止されています: model={self._settings.model}"
+            raise OpenRouterNotFoundError(message, status_code=404) from error
+        except InternalServerError as error:
+            message = f"OpenRouterプロバイダー障害が発生しました: {error}"
+            raise OpenRouterServerError(message, status_code=500) from error
+        except APIStatusError as error:
+            if error.status_code == 413:
+                raise OpenRouterInputLimitError(
+                    f"入力データ上限超過(413): {error}", status_code=413
+                ) from error
+            if error.status_code in (502, 503, 504):
+                message = f"一時的なサービス停止({error.status_code}): {error}"
+                raise OpenRouterServiceUnavailableError(message, status_code=error.status_code) from error
+            raise OpenRouterError(
+                f"APIステータスエラー({error.status_code}): {error}", status_code=error.status_code
+            ) from error
+        except APIConnectionError as error:
+            err_str = str(error).lower()
+            if "stream" in err_str or "chunk" in err_str:
+                raise OpenRouterStreamDisconnectedError(f"ストリーミング切断エラー: {error}") from error
+            raise OpenRouterConnectionError(f"接続エラーが発生しました: {error}") from error
+
+        self._validate_response_integrity(completion)
+
+        duration_ms = (perf_counter() - started_at) * 1000
+        usage = getattr(completion, "usage", None)
+        cost = _usage_cost(usage)
+        if self._settings.max_estimated_cost_usd and cost > self._settings.max_estimated_cost_usd:
+            raise OpenRouterCostLimitError(
+                f"推定コストが上限を超過しました: {cost} > {self._settings.max_estimated_cost_usd}"
+            )
+
+        content = completion.choices[0].message.content or ""
+        return ModelResponse(
+            content=content,
+            input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+            output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+            estimated_cost_usd=cost,
+            duration_ms=duration_ms,
+            retry_count=retry_count,
+        )
+
+    # クライアント接続を非同期に閉じる
+    async def close(self) -> None:
+        await self._client.close()
 
 
 # 利用量から費用を取得する

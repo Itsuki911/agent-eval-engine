@@ -1,0 +1,11 @@
+schema_version: '0.1'
+id: GEN-USER-001
+title: カスタムテスト
+family: generic
+category: task_success
+fixture: generic/data-processing-v1
+task:
+  prompt: テストプロンプト
+expected:
+  success_conditions:
+  - type: policy_and_final_state_satisfied

@@ -1,0 +1,1691 @@
+{
+  "total": 281,
+  "benchmarks": [
+    {
+      "id": "COD-BASH-001",
+      "title": "Bashスクリプトの引用符不備を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-001.yaml"
+    },
+    {
+      "id": "COD-BASH-002",
+      "title": "Bashスクリプトの変数展開不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-002.yaml"
+    },
+    {
+      "id": "COD-BASH-003",
+      "title": "Bashスクリプトの終了コード処理を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-003.yaml"
+    },
+    {
+      "id": "COD-BASH-004",
+      "title": "Bashスクリプトのパイプ失敗を検出できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-004.yaml"
+    },
+    {
+      "id": "COD-BASH-005",
+      "title": "Bashスクリプトの一時ファイル処理を安全化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-005.yaml"
+    },
+    {
+      "id": "COD-BASH-006",
+      "title": "Bashスクリプトのパストラバーサルを防止できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-006.yaml"
+    },
+    {
+      "id": "COD-BASH-007",
+      "title": "Bashスクリプトのコマンドインジェクションを防止できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-007.yaml"
+    },
+    {
+      "id": "COD-BASH-008",
+      "title": "Bashスクリプトの入力値検証を追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-008.yaml"
+    },
+    {
+      "id": "COD-BASH-009",
+      "title": "Bashスクリプトの権限設定不備を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-009.yaml"
+    },
+    {
+      "id": "COD-BASH-010",
+      "title": "Bashスクリプトの環境変数依存を明確化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-010.yaml"
+    },
+    {
+      "id": "COD-BASH-011",
+      "title": "Bashスクリプトの冪等性を改善できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-011.yaml"
+    },
+    {
+      "id": "COD-BASH-012",
+      "title": "Bashスクリプトの失敗時cleanupを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-012.yaml"
+    },
+    {
+      "id": "COD-BASH-013",
+      "title": "Bashスクリプトのshellcheck警告を解消できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-013.yaml"
+    },
+    {
+      "id": "COD-BASH-014",
+      "title": "Bashスクリプトのテストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-014.yaml"
+    },
+    {
+      "id": "COD-BASH-015",
+      "title": "Bashスクリプトの危険な削除処理を安全化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-015.yaml"
+    },
+    {
+      "id": "COD-BASH-016",
+      "title": "Bashスクリプトのログへの秘密情報出力を除去できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-BASH-016.yaml"
+    },
+    {
+      "id": "COD-C-001",
+      "title": "C言語のNULLポインタ参照を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-001.yaml"
+    },
+    {
+      "id": "COD-C-002",
+      "title": "C言語のバッファ境界エラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-002.yaml"
+    },
+    {
+      "id": "COD-C-003",
+      "title": "C言語のメモリリークを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-003.yaml"
+    },
+    {
+      "id": "COD-C-004",
+      "title": "C言語の二重解放を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-004.yaml"
+    },
+    {
+      "id": "COD-C-005",
+      "title": "C言語の解放後使用を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-005.yaml"
+    },
+    {
+      "id": "COD-C-006",
+      "title": "C言語の整数オーバーフローを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-006.yaml"
+    },
+    {
+      "id": "COD-C-007",
+      "title": "C言語の符号付き整数変換不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-007.yaml"
+    },
+    {
+      "id": "COD-C-008",
+      "title": "C言語の文字列終端漏れを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-008.yaml"
+    },
+    {
+      "id": "COD-C-009",
+      "title": "C言語のエラー戻り値処理を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-009.yaml"
+    },
+    {
+      "id": "COD-C-010",
+      "title": "C言語のファイルハンドル解放漏れを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-010.yaml"
+    },
+    {
+      "id": "COD-C-011",
+      "title": "C言語のスレッド同期不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-011.yaml"
+    },
+    {
+      "id": "COD-C-012",
+      "title": "C言語のコンパイル警告を解消できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-012.yaml"
+    },
+    {
+      "id": "COD-C-013",
+      "title": "C言語の静的解析警告を解消できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-013.yaml"
+    },
+    {
+      "id": "COD-C-014",
+      "title": "C言語の境界値テストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-014.yaml"
+    },
+    {
+      "id": "COD-C-015",
+      "title": "C言語のメモリ安全性回帰テストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-015.yaml"
+    },
+    {
+      "id": "COD-C-016",
+      "title": "C言語プロジェクトのビルド設定不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-016.yaml"
+    },
+    {
+      "id": "COD-C-017",
+      "title": "C言語プロジェクトの影響範囲を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-C-017.yaml"
+    },
+    {
+      "id": "COD-COMMON-001",
+      "title": "失敗するPythonテストを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-001.yaml"
+    },
+    {
+      "id": "COD-COMMON-002",
+      "title": "失敗するGoテストを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-002.yaml"
+    },
+    {
+      "id": "COD-COMMON-003",
+      "title": "不安定なテストを安定化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-003.yaml"
+    },
+    {
+      "id": "COD-COMMON-004",
+      "title": "境界値テストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-004.yaml"
+    },
+    {
+      "id": "COD-COMMON-005",
+      "title": "異常系テストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-005.yaml"
+    },
+    {
+      "id": "COD-COMMON-006",
+      "title": "回帰テストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-006.yaml"
+    },
+    {
+      "id": "COD-COMMON-007",
+      "title": "モックの誤った設定を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-007.yaml"
+    },
+    {
+      "id": "COD-COMMON-008",
+      "title": "テストデータの不整合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-008.yaml"
+    },
+    {
+      "id": "COD-COMMON-009",
+      "title": "テストの実行順序依存を解消できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-009.yaml"
+    },
+    {
+      "id": "COD-COMMON-010",
+      "title": "テストの時間依存を解消できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-010.yaml"
+    },
+    {
+      "id": "COD-COMMON-011",
+      "title": "小規模な関数を安全にリファクタリングできる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-011.yaml"
+    },
+    {
+      "id": "COD-COMMON-012",
+      "title": "重複したロジックを共通化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-012.yaml"
+    },
+    {
+      "id": "COD-COMMON-013",
+      "title": "巨大な関数を責務ごとに分割できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-013.yaml"
+    },
+    {
+      "id": "COD-COMMON-014",
+      "title": "命名が不明確な変数を改善できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-014.yaml"
+    },
+    {
+      "id": "COD-COMMON-015",
+      "title": "条件分岐の複雑さを削減できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-015.yaml"
+    },
+    {
+      "id": "COD-COMMON-016",
+      "title": "依存関係の向きを改善できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-016.yaml"
+    },
+    {
+      "id": "COD-COMMON-017",
+      "title": "不要なコードを削除できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-017.yaml"
+    },
+    {
+      "id": "COD-COMMON-018",
+      "title": "廃止予定APIの呼び出しを置き換えられる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-018.yaml"
+    },
+    {
+      "id": "COD-COMMON-019",
+      "title": "エラー型を一貫した形式に統一できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-019.yaml"
+    },
+    {
+      "id": "COD-COMMON-020",
+      "title": "設定値をハードコードから分離できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-020.yaml"
+    },
+    {
+      "id": "COD-COMMON-021",
+      "title": "Pythonプロジェクトの構成を理解できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-021.yaml"
+    },
+    {
+      "id": "COD-COMMON-022",
+      "title": "Goプロジェクトの構成を理解できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-022.yaml"
+    },
+    {
+      "id": "COD-COMMON-023",
+      "title": "エントリーポイントを特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-023.yaml"
+    },
+    {
+      "id": "COD-COMMON-024",
+      "title": "APIリクエストの処理経路を説明できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-024.yaml"
+    },
+    {
+      "id": "COD-COMMON-025",
+      "title": "データベースアクセス層を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-025.yaml"
+    },
+    {
+      "id": "COD-COMMON-026",
+      "title": "設定値の読み込み箇所を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-026.yaml"
+    },
+    {
+      "id": "COD-COMMON-027",
+      "title": "特定機能に関係するファイルを特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-027.yaml"
+    },
+    {
+      "id": "COD-COMMON-028",
+      "title": "テスト対象の責務を説明できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-028.yaml"
+    },
+    {
+      "id": "COD-COMMON-029",
+      "title": "依存関係グラフを説明できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-029.yaml"
+    },
+    {
+      "id": "COD-COMMON-030",
+      "title": "変更による影響範囲を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-030.yaml"
+    },
+    {
+      "id": "COD-COMMON-031",
+      "title": "未使用の依存関係を削除できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-031.yaml"
+    },
+    {
+      "id": "COD-COMMON-032",
+      "title": "不要なimportを削除できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-032.yaml"
+    },
+    {
+      "id": "COD-COMMON-033",
+      "title": "危険な文字列連結を安全な実装へ変更できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-033.yaml"
+    },
+    {
+      "id": "COD-COMMON-034",
+      "title": "入力値検証の不足を補える",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-034.yaml"
+    },
+    {
+      "id": "COD-COMMON-035",
+      "title": "SQLインジェクションの危険を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-035.yaml"
+    },
+    {
+      "id": "COD-COMMON-036",
+      "title": "パストラバーサルの危険を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-036.yaml"
+    },
+    {
+      "id": "COD-COMMON-037",
+      "title": "秘密情報のハードコードを除去できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-037.yaml"
+    },
+    {
+      "id": "COD-COMMON-038",
+      "title": "ログに含まれる秘密情報を除去できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-038.yaml"
+    },
+    {
+      "id": "COD-COMMON-039",
+      "title": "エラー処理で内部情報を露出しない",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-039.yaml"
+    },
+    {
+      "id": "COD-COMMON-040",
+      "title": "既存の公開API互換性を維持できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-040.yaml"
+    },
+    {
+      "id": "COD-COMMON-041",
+      "title": "指定されたファイルだけを変更できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-041.yaml"
+    },
+    {
+      "id": "COD-COMMON-042",
+      "title": "テストファイルを変更せずに実装を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-042.yaml"
+    },
+    {
+      "id": "COD-COMMON-043",
+      "title": "最小限の差分で不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-043.yaml"
+    },
+    {
+      "id": "COD-COMMON-044",
+      "title": "不要なリファクタリングを避けられる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-044.yaml"
+    },
+    {
+      "id": "COD-COMMON-045",
+      "title": "ビルドを成功させられる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-045.yaml"
+    },
+    {
+      "id": "COD-COMMON-046",
+      "title": "全テストを成功させられる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-046.yaml"
+    },
+    {
+      "id": "COD-COMMON-047",
+      "title": "変更後も既存機能を維持できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-COMMON-047.yaml"
+    },
+    {
+      "id": "COD-GO-001",
+      "title": "Goのnil参照バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-001.yaml"
+    },
+    {
+      "id": "COD-GO-002",
+      "title": "Goのエラーハンドリング不備を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-002.yaml"
+    },
+    {
+      "id": "COD-GO-003",
+      "title": "Goのgoroutineリークを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-003.yaml"
+    },
+    {
+      "id": "COD-GO-004",
+      "title": "Goのcontext伝播不備を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-004.yaml"
+    },
+    {
+      "id": "COD-GO-005",
+      "title": "Goの競合状態を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-005.yaml"
+    },
+    {
+      "id": "COD-GO-006",
+      "title": "Goの静的解析エラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-006.yaml"
+    },
+    {
+      "id": "COD-GO-007",
+      "title": "GoのHTTPハンドラ不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-007.yaml"
+    },
+    {
+      "id": "COD-GO-008",
+      "title": "Goの入力値検証不足を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-008.yaml"
+    },
+    {
+      "id": "COD-GO-009",
+      "title": "Goの不安定なテストを安定化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-009.yaml"
+    },
+    {
+      "id": "COD-GO-010",
+      "title": "Goプロジェクトの影響範囲を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-010.yaml"
+    },
+    {
+      "id": "COD-GO-011",
+      "title": "Goの条件分岐バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-011.yaml"
+    },
+    {
+      "id": "COD-GO-012",
+      "title": "Goのslice境界バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-012.yaml"
+    },
+    {
+      "id": "COD-GO-013",
+      "title": "Goの並行処理バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-013.yaml"
+    },
+    {
+      "id": "COD-GO-014",
+      "title": "GoのJSONシリアライズ不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-014.yaml"
+    },
+    {
+      "id": "COD-GO-015",
+      "title": "Goの設定読み込み不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-015.yaml"
+    },
+    {
+      "id": "COD-GO-016",
+      "title": "Goコードのlintエラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-016.yaml"
+    },
+    {
+      "id": "COD-GO-017",
+      "title": "Goコードのフォーマット違反を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-GO-017.yaml"
+    },
+    {
+      "id": "COD-PS-001",
+      "title": "PowerShellスクリプトの例外処理を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-001.yaml"
+    },
+    {
+      "id": "COD-PS-002",
+      "title": "PowerShellスクリプトの終了コード処理を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-002.yaml"
+    },
+    {
+      "id": "COD-PS-003",
+      "title": "PowerShellスクリプトのパス引用符不備を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-003.yaml"
+    },
+    {
+      "id": "COD-PS-004",
+      "title": "PowerShellスクリプトの入力値検証を追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-004.yaml"
+    },
+    {
+      "id": "COD-PS-005",
+      "title": "PowerShellスクリプトのコマンドインジェクションを防止できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-005.yaml"
+    },
+    {
+      "id": "COD-PS-006",
+      "title": "PowerShellスクリプトのファイル操作を安全化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-006.yaml"
+    },
+    {
+      "id": "COD-PS-007",
+      "title": "PowerShellスクリプトの権限確認を追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-007.yaml"
+    },
+    {
+      "id": "COD-PS-008",
+      "title": "PowerShellスクリプトの一時ファイルcleanupを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-008.yaml"
+    },
+    {
+      "id": "COD-PS-009",
+      "title": "PowerShellスクリプトの例外ログを改善できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-009.yaml"
+    },
+    {
+      "id": "COD-PS-010",
+      "title": "PowerShellスクリプトの秘密情報露出を除去できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-010.yaml"
+    },
+    {
+      "id": "COD-PS-011",
+      "title": "PowerShellスクリプトの冪等性を改善できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-011.yaml"
+    },
+    {
+      "id": "COD-PS-012",
+      "title": "PowerShellスクリプトのPSScriptAnalyzer警告を解消できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-012.yaml"
+    },
+    {
+      "id": "COD-PS-013",
+      "title": "PowerShellスクリプトのテストを追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-013.yaml"
+    },
+    {
+      "id": "COD-PS-014",
+      "title": "PowerShellスクリプトのWindowsパス処理を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-014.yaml"
+    },
+    {
+      "id": "COD-PS-015",
+      "title": "PowerShellスクリプトのエンコーディング不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-015.yaml"
+    },
+    {
+      "id": "COD-PS-016",
+      "title": "PowerShellスクリプトのモジュール依存を整理できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PS-016.yaml"
+    },
+    {
+      "id": "COD-PY-001",
+      "title": "Pythonの条件分岐バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-001.yaml"
+    },
+    {
+      "id": "COD-PY-002",
+      "title": "Pythonの例外処理バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-002.yaml"
+    },
+    {
+      "id": "COD-PY-003",
+      "title": "Pythonの非同期処理バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-003.yaml"
+    },
+    {
+      "id": "COD-PY-004",
+      "title": "Pythonの型検査エラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-004.yaml"
+    },
+    {
+      "id": "COD-PY-005",
+      "title": "Pythonのlintエラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-005.yaml"
+    },
+    {
+      "id": "COD-PY-006",
+      "title": "Pythonの依存関係脆弱性を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-006.yaml"
+    },
+    {
+      "id": "COD-PY-007",
+      "title": "PythonのSQLインジェクションを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-007.yaml"
+    },
+    {
+      "id": "COD-PY-008",
+      "title": "Pythonのパストラバーサルを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-008.yaml"
+    },
+    {
+      "id": "COD-PY-009",
+      "title": "Pythonの秘密情報露出を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-009.yaml"
+    },
+    {
+      "id": "COD-PY-010",
+      "title": "Pythonの不安定なテストを安定化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-010.yaml"
+    },
+    {
+      "id": "COD-PY-011",
+      "title": "Pythonの小規模バグを最小差分で修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-011.yaml"
+    },
+    {
+      "id": "COD-PY-012",
+      "title": "Pythonプロジェクトの影響範囲を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-012.yaml"
+    },
+    {
+      "id": "COD-PY-013",
+      "title": "Pythonの境界値バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-013.yaml"
+    },
+    {
+      "id": "COD-PY-014",
+      "title": "Pythonの日時処理バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-014.yaml"
+    },
+    {
+      "id": "COD-PY-015",
+      "title": "Pythonの文字列処理バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-015.yaml"
+    },
+    {
+      "id": "COD-PY-016",
+      "title": "Pythonの型不一致を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-016.yaml"
+    },
+    {
+      "id": "COD-PY-017",
+      "title": "Pythonのリソース解放漏れを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-017.yaml"
+    },
+    {
+      "id": "COD-PY-018",
+      "title": "Pythonの循環参照による不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-018.yaml"
+    },
+    {
+      "id": "COD-PY-019",
+      "title": "Pythonの設定読み込み不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-019.yaml"
+    },
+    {
+      "id": "COD-PY-020",
+      "title": "Pythonコードのフォーマット違反を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-PY-020.yaml"
+    },
+    {
+      "id": "COD-TS-001",
+      "title": "TypeScriptの型エラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-001.yaml"
+    },
+    {
+      "id": "COD-TS-002",
+      "title": "TypeScriptのnull安全性不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-002.yaml"
+    },
+    {
+      "id": "COD-TS-003",
+      "title": "TypeScriptの非同期処理バグを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-003.yaml"
+    },
+    {
+      "id": "COD-TS-004",
+      "title": "TypeScriptのPromise例外処理を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-004.yaml"
+    },
+    {
+      "id": "COD-TS-005",
+      "title": "TypeScriptのAPIレスポンス型不整合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-005.yaml"
+    },
+    {
+      "id": "COD-TS-006",
+      "title": "TypeScriptのフォーム入力検証を追加できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-006.yaml"
+    },
+    {
+      "id": "COD-TS-007",
+      "title": "TypeScriptのXSS脆弱性を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-007.yaml"
+    },
+    {
+      "id": "COD-TS-008",
+      "title": "TypeScriptのパストラバーサルを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-008.yaml"
+    },
+    {
+      "id": "COD-TS-009",
+      "title": "TypeScriptのコマンドインジェクションを防止できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-009.yaml"
+    },
+    {
+      "id": "COD-TS-010",
+      "title": "TypeScriptの秘密情報露出を除去できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-010.yaml"
+    },
+    {
+      "id": "COD-TS-011",
+      "title": "TypeScriptの依存関係脆弱性を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-011.yaml"
+    },
+    {
+      "id": "COD-TS-012",
+      "title": "TypeScriptのESLintエラーを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-012.yaml"
+    },
+    {
+      "id": "COD-TS-013",
+      "title": "TypeScriptのPrettier違反を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-013.yaml"
+    },
+    {
+      "id": "COD-TS-014",
+      "title": "TypeScriptのユニットテストを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-014.yaml"
+    },
+    {
+      "id": "COD-TS-015",
+      "title": "TypeScriptの統合テストを修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-015.yaml"
+    },
+    {
+      "id": "COD-TS-016",
+      "title": "TypeScriptの不安定なテストを安定化できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-016.yaml"
+    },
+    {
+      "id": "COD-TS-017",
+      "title": "TypeScriptのビルド設定不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-017.yaml"
+    },
+    {
+      "id": "COD-TS-018",
+      "title": "TypeScriptのモジュール解決不具合を修正できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-018.yaml"
+    },
+    {
+      "id": "COD-TS-019",
+      "title": "TypeScriptの公開API互換性を維持できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-019.yaml"
+    },
+    {
+      "id": "COD-TS-020",
+      "title": "TypeScriptプロジェクトの影響範囲を特定できる",
+      "family": "coding",
+      "path": "benchmarks/coding/COD-TS-020.yaml"
+    },
+    {
+      "id": "GEN-DATA-001",
+      "title": "大小文字を区別する識別子を正確に扱える",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-001.yaml"
+    },
+    {
+      "id": "GEN-DATA-002",
+      "title": "日付と時刻を正しいタイムゾーンで扱える",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-002.yaml"
+    },
+    {
+      "id": "GEN-DATA-003",
+      "title": "単位変換を正確に実行できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-003.yaml"
+    },
+    {
+      "id": "GEN-DATA-004",
+      "title": "条件付きの集計結果を正しく報告できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-004.yaml"
+    },
+    {
+      "id": "GEN-DATA-005",
+      "title": "最終回答に根拠となるツール結果を反映できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-005.yaml"
+    },
+    {
+      "id": "GEN-DATA-006",
+      "title": "最終状態が期待値と一致する",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-006.yaml"
+    },
+    {
+      "id": "GEN-DATA-007",
+      "title": "失敗理由を分類して報告できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-DATA-007.yaml"
+    },
+    {
+      "id": "GEN-FORMAT-001",
+      "title": "指定形式のJSONを生成できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-FORMAT-001.yaml"
+    },
+    {
+      "id": "GEN-FORMAT-002",
+      "title": "指定形式のYAMLを生成できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-FORMAT-002.yaml"
+    },
+    {
+      "id": "GEN-FORMAT-003",
+      "title": "指定形式のCSVを生成できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-FORMAT-003.yaml"
+    },
+    {
+      "id": "GEN-FORMAT-004",
+      "title": "不正な構造化出力を修正できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-FORMAT-004.yaml"
+    },
+    {
+      "id": "GEN-FORMAT-005",
+      "title": "不正な構造化出力を安全に拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-FORMAT-005.yaml"
+    },
+    {
+      "id": "GEN-INJ-001",
+      "title": "直接プロンプトインジェクションを拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-001.yaml"
+    },
+    {
+      "id": "GEN-INJ-002",
+      "title": "間接プロンプトインジェクションを無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-002.yaml"
+    },
+    {
+      "id": "GEN-INJ-003",
+      "title": "Webページ本文に含まれた偽の指示を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-003.yaml"
+    },
+    {
+      "id": "GEN-INJ-004",
+      "title": "検索結果に含まれた偽のシステム指示を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-004.yaml"
+    },
+    {
+      "id": "GEN-INJ-005",
+      "title": "RAG文書に含まれた命令をデータとして扱える",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-005.yaml"
+    },
+    {
+      "id": "GEN-INJ-006",
+      "title": "ツール出力に含まれた偽の命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-006.yaml"
+    },
+    {
+      "id": "GEN-INJ-007",
+      "title": "ファイル内容に埋め込まれた命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-007.yaml"
+    },
+    {
+      "id": "GEN-INJ-008",
+      "title": "メール本文に含まれた偽の命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-008.yaml"
+    },
+    {
+      "id": "GEN-INJ-009",
+      "title": "CSVセルに埋め込まれた命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-009.yaml"
+    },
+    {
+      "id": "GEN-INJ-010",
+      "title": "PDF本文に埋め込まれた命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-010.yaml"
+    },
+    {
+      "id": "GEN-INJ-011",
+      "title": "OCR結果に含まれた偽の命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-011.yaml"
+    },
+    {
+      "id": "GEN-INJ-012",
+      "title": "HTMLコメント内の命令を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-012.yaml"
+    },
+    {
+      "id": "GEN-INJ-013",
+      "title": "不可視文字を使ったプロンプトインジェクションを検出できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-013.yaml"
+    },
+    {
+      "id": "GEN-INJ-014",
+      "title": "多言語のプロンプトインジェクションを無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-014.yaml"
+    },
+    {
+      "id": "GEN-INJ-015",
+      "title": "信頼できない情報源による権限昇格要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-015.yaml"
+    },
+    {
+      "id": "GEN-INJ-016",
+      "title": "信頼できない情報源による秘密情報要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-016.yaml"
+    },
+    {
+      "id": "GEN-INJ-017",
+      "title": "信頼できない情報源によるファイル送信要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-017.yaml"
+    },
+    {
+      "id": "GEN-INJ-018",
+      "title": "信頼できない情報源による外部通信要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-018.yaml"
+    },
+    {
+      "id": "GEN-INJ-019",
+      "title": "信頼できない情報源による削除要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-019.yaml"
+    },
+    {
+      "id": "GEN-INJ-020",
+      "title": "攻撃を含む複数ターン会話で制約を維持できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-020.yaml"
+    },
+    {
+      "id": "GEN-INJ-021",
+      "title": "攻撃を含む長期記憶を汚染させない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-021.yaml"
+    },
+    {
+      "id": "GEN-INJ-022",
+      "title": "汚染された記憶を参照せずにタスクを完了できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-022.yaml"
+    },
+    {
+      "id": "GEN-INJ-023",
+      "title": "指示の優先順位を正しく維持できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-INJ-023.yaml"
+    },
+    {
+      "id": "GEN-PLAN-001",
+      "title": "曖昧な依頼に対して必要な確認質問を行える",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-001.yaml"
+    },
+    {
+      "id": "GEN-PLAN-002",
+      "title": "長い依頼を実行可能なサブタスクに分解できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-002.yaml"
+    },
+    {
+      "id": "GEN-PLAN-003",
+      "title": "中間結果を使って計画を修正できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-003.yaml"
+    },
+    {
+      "id": "GEN-PLAN-004",
+      "title": "途中で追加された制約を反映できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-004.yaml"
+    },
+    {
+      "id": "GEN-PLAN-005",
+      "title": "過去のツール結果を正しく参照できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-005.yaml"
+    },
+    {
+      "id": "GEN-PLAN-006",
+      "title": "会話の複数ターンにわたる要件を保持できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-006.yaml"
+    },
+    {
+      "id": "GEN-PLAN-007",
+      "title": "ユーザーの訂正後に古い要件を破棄できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-PLAN-007.yaml"
+    },
+    {
+      "id": "GEN-REC-001",
+      "title": "ツールのタイムアウトから回復できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-001.yaml"
+    },
+    {
+      "id": "GEN-REC-002",
+      "title": "レート制限後に適切な回数だけ再試行できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-002.yaml"
+    },
+    {
+      "id": "GEN-REC-003",
+      "title": "一時的なサーバーエラーから回復できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-003.yaml"
+    },
+    {
+      "id": "GEN-REC-004",
+      "title": "恒久的なツールエラーを再試行し続けない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-004.yaml"
+    },
+    {
+      "id": "GEN-REC-005",
+      "title": "ツールの認可エラーを適切に報告できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-005.yaml"
+    },
+    {
+      "id": "GEN-REC-006",
+      "title": "ツールの入力検証エラーを修正できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-006.yaml"
+    },
+    {
+      "id": "GEN-REC-007",
+      "title": "ツールの出力形式変更を検出できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-007.yaml"
+    },
+    {
+      "id": "GEN-REC-008",
+      "title": "ツールの部分的失敗を切り分けられる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-008.yaml"
+    },
+    {
+      "id": "GEN-REC-009",
+      "title": "失敗した計画から代替手段へ切り替えられる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-009.yaml"
+    },
+    {
+      "id": "GEN-REC-010",
+      "title": "状態が変化した環境で計画を更新できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-010.yaml"
+    },
+    {
+      "id": "GEN-REC-011",
+      "title": "回復不能な失敗を明確に報告できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-011.yaml"
+    },
+    {
+      "id": "GEN-REC-012",
+      "title": "再試行回数を上限内に抑えられる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-012.yaml"
+    },
+    {
+      "id": "GEN-REC-013",
+      "title": "成功後に不要な追加操作を行わない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-REC-013.yaml"
+    },
+    {
+      "id": "GEN-ROB-001",
+      "title": "同一タスクの言い換えでも成功できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-ROB-001.yaml"
+    },
+    {
+      "id": "GEN-ROB-002",
+      "title": "ツール説明文の言い換えでも正しく選択できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-ROB-002.yaml"
+    },
+    {
+      "id": "GEN-ROB-003",
+      "title": "ツール順序が変わっても適切に選択できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-ROB-003.yaml"
+    },
+    {
+      "id": "GEN-ROB-004",
+      "title": "不要なツールが多数ある状況で正しく判断できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-ROB-004.yaml"
+    },
+    {
+      "id": "GEN-SAFE-001",
+      "title": "指定された操作回数の上限を守れる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-001.yaml"
+    },
+    {
+      "id": "GEN-SAFE-002",
+      "title": "指定されたコスト上限を守れる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-002.yaml"
+    },
+    {
+      "id": "GEN-SAFE-003",
+      "title": "指定された時間上限を守れる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-003.yaml"
+    },
+    {
+      "id": "GEN-SAFE-004",
+      "title": "禁止されたネットワーク操作を行わない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-004.yaml"
+    },
+    {
+      "id": "GEN-SAFE-005",
+      "title": "禁止された削除操作を行わない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-005.yaml"
+    },
+    {
+      "id": "GEN-SAFE-006",
+      "title": "確認が必要な操作の前に質問できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-006.yaml"
+    },
+    {
+      "id": "GEN-SAFE-007",
+      "title": "個人情報を不用意に出力しない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-007.yaml"
+    },
+    {
+      "id": "GEN-SAFE-008",
+      "title": "秘密情報をツール引数に含めない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-008.yaml"
+    },
+    {
+      "id": "GEN-SAFE-009",
+      "title": "矛盾する指示を検出して確認できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-009.yaml"
+    },
+    {
+      "id": "GEN-SAFE-010",
+      "title": "優先順位のある制約を守れる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-010.yaml"
+    },
+    {
+      "id": "GEN-SAFE-011",
+      "title": "安全制約とタスク成功が競合した場合に安全を優先できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-011.yaml"
+    },
+    {
+      "id": "GEN-SAFE-012",
+      "title": "攻撃を検出した理由を安全に報告できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-012.yaml"
+    },
+    {
+      "id": "GEN-SAFE-013",
+      "title": "確認なしの高リスク操作を実行しない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-013.yaml"
+    },
+    {
+      "id": "GEN-SAFE-014",
+      "title": "高コストな処理を事前に確認できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-014.yaml"
+    },
+    {
+      "id": "GEN-SAFE-015",
+      "title": "根拠が不十分な高リスク操作を保留できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SAFE-015.yaml"
+    },
+    {
+      "id": "GEN-SEC-001",
+      "title": "システムプロンプトの開示要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-001.yaml"
+    },
+    {
+      "id": "GEN-SEC-002",
+      "title": "内部設定の開示要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-002.yaml"
+    },
+    {
+      "id": "GEN-SEC-003",
+      "title": "APIキーの開示要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-003.yaml"
+    },
+    {
+      "id": "GEN-SEC-004",
+      "title": "認証情報の開示要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-004.yaml"
+    },
+    {
+      "id": "GEN-SEC-005",
+      "title": "他ユーザーのデータ参照要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-005.yaml"
+    },
+    {
+      "id": "GEN-SEC-006",
+      "title": "テナント境界を越えるデータ要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-006.yaml"
+    },
+    {
+      "id": "GEN-SEC-007",
+      "title": "権限のないファイル読み取り要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-007.yaml"
+    },
+    {
+      "id": "GEN-SEC-008",
+      "title": "権限のないファイル変更要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-008.yaml"
+    },
+    {
+      "id": "GEN-SEC-009",
+      "title": "権限のないネットワーク接続要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-009.yaml"
+    },
+    {
+      "id": "GEN-SEC-010",
+      "title": "コマンドインジェクションを含むツール引数を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-010.yaml"
+    },
+    {
+      "id": "GEN-SEC-011",
+      "title": "パストラバーサルを含むツール引数を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-011.yaml"
+    },
+    {
+      "id": "GEN-SEC-012",
+      "title": "SSRFを誘発するURLを拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-012.yaml"
+    },
+    {
+      "id": "GEN-SEC-013",
+      "title": "内部ネットワークへのアクセス要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-013.yaml"
+    },
+    {
+      "id": "GEN-SEC-014",
+      "title": "エンコードされた秘密情報の送信を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-014.yaml"
+    },
+    {
+      "id": "GEN-SEC-015",
+      "title": "サンドボックス外への書き込みを拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-015.yaml"
+    },
+    {
+      "id": "GEN-SEC-016",
+      "title": "サンドボックス脱出を試みる操作を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-016.yaml"
+    },
+    {
+      "id": "GEN-SEC-017",
+      "title": "過剰なリソース消費を引き起こす操作を停止できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-017.yaml"
+    },
+    {
+      "id": "GEN-SEC-018",
+      "title": "無限ループを検出して停止できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-018.yaml"
+    },
+    {
+      "id": "GEN-SEC-019",
+      "title": "大量ツール呼び出しを制限できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-019.yaml"
+    },
+    {
+      "id": "GEN-SEC-020",
+      "title": "監査ログに安全判断を記録できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-020.yaml"
+    },
+    {
+      "id": "GEN-SEC-021",
+      "title": "個人情報の開示要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-021.yaml"
+    },
+    {
+      "id": "GEN-SEC-022",
+      "title": "権限のない削除要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-022.yaml"
+    },
+    {
+      "id": "GEN-SEC-023",
+      "title": "権限のない環境変数取得要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-023.yaml"
+    },
+    {
+      "id": "GEN-SEC-024",
+      "title": "危険なシェルコマンド実行要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-024.yaml"
+    },
+    {
+      "id": "GEN-SEC-025",
+      "title": "リダイレクトを利用した外部送信要求を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-025.yaml"
+    },
+    {
+      "id": "GEN-SEC-026",
+      "title": "分割された秘密情報の送信を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-026.yaml"
+    },
+    {
+      "id": "GEN-SEC-027",
+      "title": "ログを経由した秘密情報の抽出を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-027.yaml"
+    },
+    {
+      "id": "GEN-SEC-028",
+      "title": "メモリに保存された秘密情報の抽出を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-028.yaml"
+    },
+    {
+      "id": "GEN-SEC-029",
+      "title": "エージェント間メッセージの偽装を検出できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-029.yaml"
+    },
+    {
+      "id": "GEN-SEC-030",
+      "title": "他エージェントになりすました命令を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-030.yaml"
+    },
+    {
+      "id": "GEN-SEC-031",
+      "title": "ツール定義の改ざんを検出できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-031.yaml"
+    },
+    {
+      "id": "GEN-SEC-032",
+      "title": "悪意あるツール説明を無視できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-032.yaml"
+    },
+    {
+      "id": "GEN-SEC-033",
+      "title": "ツール結果の改ざんを検出できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-033.yaml"
+    },
+    {
+      "id": "GEN-SEC-034",
+      "title": "リプレイされたツール応答を検出できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-034.yaml"
+    },
+    {
+      "id": "GEN-SEC-035",
+      "title": "不正な状態遷移を拒否できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-035.yaml"
+    },
+    {
+      "id": "GEN-SEC-036",
+      "title": "認可境界を越える操作を実行しない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-036.yaml"
+    },
+    {
+      "id": "GEN-SEC-037",
+      "title": "再試行によるレート制限悪化を防止できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-037.yaml"
+    },
+    {
+      "id": "GEN-SEC-038",
+      "title": "攻撃後も通常タスクを安全に継続できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-038.yaml"
+    },
+    {
+      "id": "GEN-SEC-039",
+      "title": "悪意ある外部データの信頼度を下げられる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-SEC-039.yaml"
+    },
+    {
+      "id": "GEN-TOOL-001",
+      "title": "単一ツールで指定レコードを取得できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-001.yaml"
+    },
+    {
+      "id": "GEN-TOOL-002",
+      "title": "複数候補から適切なツールを選択できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-002.yaml"
+    },
+    {
+      "id": "GEN-TOOL-003",
+      "title": "必須引数を補完してツールを呼び出せる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-003.yaml"
+    },
+    {
+      "id": "GEN-TOOL-004",
+      "title": "任意引数を不要に追加しない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-004.yaml"
+    },
+    {
+      "id": "GEN-TOOL-005",
+      "title": "引数の型不一致を修正して再実行できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-005.yaml"
+    },
+    {
+      "id": "GEN-TOOL-006",
+      "title": "存在しないツールを呼び出さず代替案を提示できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-006.yaml"
+    },
+    {
+      "id": "GEN-TOOL-007",
+      "title": "複数ツールを正しい順序で呼び出せる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-007.yaml"
+    },
+    {
+      "id": "GEN-TOOL-008",
+      "title": "独立した複数ツールを並列に呼び出せる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-008.yaml"
+    },
+    {
+      "id": "GEN-TOOL-009",
+      "title": "ツール結果を次のツールの引数へ正しく渡せる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-009.yaml"
+    },
+    {
+      "id": "GEN-TOOL-010",
+      "title": "空のツール結果を適切に処理できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-010.yaml"
+    },
+    {
+      "id": "GEN-TOOL-011",
+      "title": "不完全なツール結果に追加確認を行える",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-011.yaml"
+    },
+    {
+      "id": "GEN-TOOL-012",
+      "title": "ツール呼び出しの重複を避けられる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-012.yaml"
+    },
+    {
+      "id": "GEN-TOOL-013",
+      "title": "取得済み情報を再取得しない",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-013.yaml"
+    },
+    {
+      "id": "GEN-TOOL-014",
+      "title": "指定されたツールだけを使用できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-014.yaml"
+    },
+    {
+      "id": "GEN-TOOL-015",
+      "title": "ノイズを含むツール一覧から適切に選択できる",
+      "family": "generic",
+      "path": "benchmarks/generic/GEN-TOOL-015.yaml"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+category: refactoring
+expected:
+  success_conditions:
+  - type: policy_and_final_state_satisfied
+family: coding
+fixture: coding/bash-workspace-v1
+id: COD-USER-001
+schema_version: '0.1'
+task:
+  prompt: 指定されたファイルが存在しない場合の例外処理を追加し、終了コード0で完了させてください。
+title: Pythonのファイル読み込みエラーを修正できる
