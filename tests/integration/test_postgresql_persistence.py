@@ -136,7 +136,12 @@ def test_events_reconstruct_complete_history(session: Session) -> None:
     details = repository.get_run_details(run.id)
     assert details["metrics"][0]["name"] == "task_success"
     assert details["evaluations"][0]["status"] == "passed"
+    assert details["event_total"] == 2
     assert repository.list_runs()[0].id == run.id
+    assert repository.count_runs() == 1
+    assert repository.count_events(run.id) == 2
+    assert [event.sequence for event in repository.list_events(run.id, limit=1, offset=1)] == [1]
+    assert [event["sequence"] for event in repository.get_run_details(run.id, event_limit=1, event_offset=1)["events"]] == [1]
 
 
 # 重複したイベント順序を拒否する

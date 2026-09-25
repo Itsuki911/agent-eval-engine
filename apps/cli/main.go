@@ -63,10 +63,21 @@ type appState struct {
 	height       int
 	backend      bool
 	runs         []backendRun
+	runTotal     int
+	runOffset    int
 	detail       *backendDetail
 	benchmarks   []backendBenchmark
+	benchmarkTotal   int
+	benchmarkOffset  int
+	benchmarkFamily  string
+	benchmarkQuery   string
+	filterInput      bool
 	comparison   *backendComparison
+	comparisonOffset int
 	progress     []backendProgress
+	traceOffset  int
+	running      bool
+	cancelling   bool
 	backendError string
 }
 
@@ -98,7 +109,36 @@ func parseFlags() appState {
 		noClear:    *noClear,
 		traceIndex: 2,
 		backend:    *backend,
+		benchmarkFamily: "all",
 	}
+}
+
+// 端末高に応じたページ件数を返す
+func pageSize(state appState) int {
+	if state.height <= 0 {
+		return 8
+	}
+	if state.height < 24 {
+		return 5
+	}
+	rows := (state.height - 10) / 3
+	if rows > 12 {
+		return 12
+	}
+	return max(rows, 5)
+}
+
+// 表示ページの終端を返す
+func pageEnd(offset int, size int, total int) int {
+	return min(offset+size, total)
+}
+
+// ページ番号を表示用に整える
+func pageLabel(offset int, count int, total int) string {
+	if total == 0 {
+		return "0 / 0"
+	}
+	return fmt.Sprintf("%d-%d / %d", offset+1, offset+count, total)
 }
 
 // 画面を標準出力へ描画する
@@ -435,6 +475,10 @@ func renderBackendRuns(state appState) string {
 			paint(blueStyle, "b 戻る     q 終了"),
 		}, "\n") + "\n"
 	}
+	total := state.runTotal
+	if total == 0 {
+		total = len(state.runs)
+	}
 	rows := make([]string, 0, len(state.runs)*3)
 	for index, run := range state.runs {
 		status := paint(slateStyle, run.Status)
@@ -456,9 +500,9 @@ func renderBackendRuns(state appState) string {
 	}
 	return strings.Join(append([]string{
 		paint(cyanStyle, "EVALUATION RESULTS"),
-		paint(slateStyle, fmt.Sprintf("PostgreSQLの実行履歴 (%d件)", len(state.runs))),
+		paint(slateStyle, "PostgreSQLの実行履歴 "+pageLabel(state.runOffset, len(state.runs), total)),
 		paint(cyanStyle, divider),
-	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択     Enter 詳細     t Trace     c 比較     r 更新     b 戻る     q 終了"))...), "\n") + "\n"
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択・ページ移動     Enter 詳細     t Trace     c 比較     r 更新     b 戻る     q 終了"))...), "\n") + "\n"
 }
 
 // DB実行詳細を画面用に整える
@@ -489,7 +533,7 @@ func renderBackendDetail(state appState) string {
 		paint(purpleStyle, "BENCHMARK  "+detail.Benchmark),
 		paint(purpleStyle, "MODEL      "+detail.Model),
 		paint(purpleStyle, "COST       "+cost),
-		paint(purpleStyle, fmt.Sprintf("EVENTS     %d", len(detail.Events))),
+		paint(purpleStyle, fmt.Sprintf("EVENTS     %d", detail.EventTotal)),
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "評価指標"),
 	}, append(metricLines, paint(cyanStyle, divider), paint(blueStyle, "t Trace     c 比較     r 更新     b 一覧へ戻る     q 終了"))...), "\n") + "\n"
@@ -498,18 +542,27 @@ func renderBackendDetail(state appState) string {
 // DBイベントを画面用に整える
 func renderBackendTrace(state appState) string {
 	events := state.progress
+	total := len(events)
 	if state.detail != nil {
 		events = make([]backendProgress, len(state.detail.Events))
 		for index, event := range state.detail.Events {
 			events[index] = backendProgress{Type: "progress", Sequence: event.Sequence, EventType: event.EventType, Status: "saved"}
 		}
+		total = state.detail.EventTotal
+		if total == 0 {
+			total = len(events)
+		}
+	} else {
+		start := min(state.traceOffset, len(events))
+		end := pageEnd(start, pageSize(state), len(events))
+		events = events[start:end]
 	}
 	if len(events) == 0 {
 		return renderBackendLoading("実行イベントを待っています")
 	}
-	index := state.traceIndex
+	index := state.traceIndex - state.traceOffset
 	if index < 0 || index >= len(events) {
-		index = len(events) - 1
+		index = 0
 	}
 	rows := make([]string, 0, len(events))
 	for eventIndex, event := range events {
@@ -533,13 +586,23 @@ func renderBackendTrace(state appState) string {
 			detailLines = append(detailLines, paint(redStyle, "error: "+formatPayload(event.Error)))
 		}
 	}
+	running := ""
+	if state.running {
+		if state.cancelling {
+			running = paint(amberStyle, "評価を中止しています。完了を待っています。")
+		} else {
+			running = paint(amberStyle, "評価を実行中です。q で中止できます。")
+		}
+	}
 	return strings.Join(append([]string{
 		paint(cyanStyle, "TRACE  |  PostgreSQL events"),
+		paint(slateStyle, "イベント "+pageLabel(state.traceOffset, len(events), total)),
+		running,
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "処理の流れ (Timeline)"),
 	}, append(rows, "", paint(cyanStyle, "SELECTED EVENT"))...), "\n") + "\n" + strings.Join(append(detailLines,
 		paint(cyanStyle, divider),
-		paint(blueStyle, "↑↓ 移動     r 更新     b 戻る     q 終了"),
+		paint(blueStyle, "↑↓ 選択・ページ移動     r 更新     b 戻る     q 終了"),
 	), "\n") + "\n"
 }
 
@@ -580,12 +643,20 @@ func renderBackendNewEvaluation(state appState) string {
 		}
 		rows = append(rows, line, paint(slateStyle, "    "+benchmark.Family+"  |  "+benchmark.Path))
 	}
+	filter := "all"
+	if state.benchmarkFamily != "all" {
+		filter = state.benchmarkFamily
+	}
+	search := state.benchmarkQuery
+	if state.filterInput {
+		search += "_"
+	}
 	return strings.Join(append([]string{
 		paint(cyanStyle, "NEW EVALUATION"),
-		paint(slateStyle, "PostgreSQLへ保存する評価を開始します。"),
+		paint(slateStyle, "候補 "+pageLabel(state.benchmarkOffset, len(state.benchmarks), state.benchmarkTotal)+"  family: "+filter),
 		paint(cyanStyle, divider),
-		paint(purpleStyle, "STEP 1 / 2   benchmarkを選択"),
-	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択     Enter 確認     b 戻る     q 終了"))...), "\n") + "\n"
+		paint(purpleStyle, "STEP 1 / 2   benchmarkを選択  search: "+search),
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択・ページ移動     f family     / 検索     Enter 確認     b 戻る     q 終了"))...), "\n") + "\n"
 }
 
 // backend実行確認を画面用に整える
@@ -637,10 +708,15 @@ func renderBackendCompare(state appState) string {
 		}
 		rows = append(rows, paint(slateStyle, fmt.Sprintf("%s  |  %s → %s  |  %+.2f", metric.Name, left, right, metric.Difference)))
 	}
+	total := state.comparison.Total
+	if total == 0 {
+		total = len(state.comparison.Metrics)
+	}
 	return strings.Join(append([]string{
 		paint(cyanStyle, "COMPARE  |  "+state.comparison.LeftRunID+" ↔ "+state.comparison.RightRunID),
+		paint(slateStyle, "指標 "+pageLabel(state.comparison.Offset, len(state.comparison.Metrics), total)),
 		paint(cyanStyle, divider),
-	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "b 一覧へ戻る     q 終了"))...), "\n") + "\n"
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ ページ移動     b 一覧へ戻る     q 終了"))...), "\n") + "\n"
 }
 
 // JSON payloadを短く表示する
@@ -660,40 +736,59 @@ func formatPayload(payload map[string]any) string {
 func refreshBackendState(state *appState, client backendClient) {
 	contextValue := context.Background()
 	if state.screen == runsScreen || state.screen == detailScreen || state.screen == traceScreen || state.screen == compareScreen {
-		runs, err := client.listRuns(contextValue)
+		runs, total, err := client.listRuns(contextValue, pageSize(*state), state.runOffset)
 		if err != nil {
 			setBackendError(state, "bridge", err)
 			return
 		}
 		state.runs = runs
+		state.runTotal = total
 		if state.runIndex >= len(state.runs) {
 			state.runIndex = max(0, len(state.runs)-1)
 		}
 	}
 	if state.screen == newEvalScreen {
-		benchmarks, err := client.listBenchmarks(contextValue)
+		benchmarks, total, err := client.listBenchmarks(
+			contextValue,
+			state.benchmarkFamily,
+			state.benchmarkQuery,
+			pageSize(*state),
+			state.benchmarkOffset,
+		)
 		if err != nil {
 			setBackendError(state, "bridge", err)
 			return
 		}
 		state.benchmarks = benchmarks
+		state.benchmarkTotal = total
 		if state.newEvalIndex >= len(state.benchmarks) {
 			state.newEvalIndex = max(0, len(state.benchmarks)-1)
 		}
 	}
 	if (state.screen == detailScreen || state.screen == traceScreen) && len(state.runs) > 0 {
-		detail, err := client.showRun(contextValue, state.runs[state.runIndex].RunID)
+		detail, err := client.showRun(
+			contextValue,
+			state.runs[state.runIndex].RunID,
+			pageSize(*state),
+			state.traceOffset,
+		)
 		if err != nil {
 			setBackendError(state, "bridge", err)
 			return
 		}
 		state.detail = &detail
-		if state.traceIndex >= len(detail.Events) {
-			state.traceIndex = max(0, len(detail.Events)-1)
+		if state.traceIndex >= detail.EventTotal {
+			state.traceIndex = max(0, detail.EventTotal-1)
 		}
 	}
 	if state.screen == compareScreen && len(state.runs) >= 2 {
-		comparison, err := client.compare(contextValue, state.runs[0].RunID, state.runs[1].RunID)
+		comparison, err := client.compare(
+			contextValue,
+			state.runs[0].RunID,
+			state.runs[1].RunID,
+			pageSize(*state),
+			state.comparisonOffset,
+		)
 		if err != nil {
 			setBackendError(state, "bridge", err)
 			return
@@ -709,45 +804,46 @@ func setBackendError(state *appState, kind string, err error) {
 	state.backendError = "安全のため詳細は標準エラーへ出力しました。"
 }
 
-// 選択benchmarkを評価実行する
-func startBackendRun(state *appState, client backendClient, output io.Writer) {
+// 評価実行の更新値を表す
+type runUpdate struct {
+	progress *backendProgress
+	result   *backendRunResult
+	err      error
+}
+
+// 評価実行を別goroutineで開始する
+func startBackendRunAsync(ctx context.Context, state *appState, client backendClient) <-chan runUpdate {
+	updates := make(chan runUpdate)
 	if len(state.benchmarks) == 0 {
-		setBackendError(state, "bridge", fmt.Errorf("benchmark is not selected"))
-		return
+		go func() {
+			defer close(updates)
+			updates <- runUpdate{err: fmt.Errorf("benchmark is not selected")}
+		}()
+		return updates
 	}
 	benchmark := state.benchmarks[state.newEvalIndex]
 	state.progress = nil
 	state.detail = nil
 	state.screen = traceScreen
-	result, err := client.run(context.Background(), benchmark.Path, func(progress backendProgress) {
-		state.progress = append(state.progress, progress)
-		state.traceIndex = max(0, len(state.progress)-1)
-		_ = render(*state, output)
-	})
-	if err != nil {
-		setBackendError(state, "bridge", err)
-		return
-	}
-	runs, err := client.listRuns(context.Background())
-	if err != nil {
-		setBackendError(state, "bridge", err)
-		return
-	}
-	state.runs = runs
-	for index, run := range runs {
-		if run.RunID == result.RunID {
-			state.runIndex = index
-			break
+	state.traceIndex = 0
+	state.traceOffset = 0
+	state.running = true
+	state.cancelling = false
+	go func() {
+		defer close(updates)
+		result, err := client.run(ctx, benchmark.Path, func(progress backendProgress) {
+			select {
+			case updates <- runUpdate{progress: &progress}:
+			case <-ctx.Done():
+			}
+		})
+		if err != nil {
+			updates <- runUpdate{err: err}
+			return
 		}
-	}
-	detail, err := client.showRun(context.Background(), result.RunID)
-	if err != nil {
-		setBackendError(state, "bridge", err)
-		return
-	}
-	state.detail = &detail
-	state.traceIndex = max(0, len(detail.Events)-1)
-	state.screen = detailScreen
+		updates <- runUpdate{result: &result}
+	})
+	return updates
 }
 
 // 詳細画面を作成する
@@ -993,6 +1089,26 @@ func nextState(state appState, key string) (appState, bool) {
 	if key == "q" {
 		return state, true
 	}
+	if state.backend && state.screen == newEvalScreen && state.filterInput {
+		switch key {
+		case "enter":
+			state.filterInput = false
+			state.benchmarkOffset = 0
+			state.newEvalIndex = 0
+		case "backspace":
+			if len(state.benchmarkQuery) > 0 {
+				_, size := utf8.DecodeLastRuneInString(state.benchmarkQuery)
+				state.benchmarkQuery = state.benchmarkQuery[:len(state.benchmarkQuery)-size]
+			}
+		case "escape":
+			state.filterInput = false
+		default:
+			if len(key) == 1 && key >= " " {
+				state.benchmarkQuery += key
+			}
+		}
+		return state, false
+	}
 	if key == "r" && state.backend && state.screen != errorScreen {
 		return state, false
 	}
@@ -1017,8 +1133,10 @@ func nextState(state appState, key string) (appState, bool) {
 			state.screen = detailScreen
 			state.detailIndex = 0
 		case newEvalScreen:
-			state.screen = confirmScreen
-			state.confirmIndex = 0
+			if !state.backend || len(state.benchmarks) > 0 {
+				state.screen = confirmScreen
+				state.confirmIndex = 0
+			}
 		case searchScreen:
 			state.screen = runsScreen
 		case detailScreen:
@@ -1075,11 +1193,32 @@ func nextState(state appState, key string) (appState, bool) {
 		state.detailIndex = 0
 	case "t":
 		state.screen = traceScreen
-		if state.traceIndex < 0 || state.traceIndex > 5 {
+		if state.backend {
+			state.traceIndex = 0
+			state.traceOffset = 0
+		} else if state.traceIndex < 0 || state.traceIndex > 5 {
 			state.traceIndex = 2
 		}
 	case "c":
 		state.screen = compareScreen
+		state.comparisonOffset = 0
+	case "f":
+		if state.backend && state.screen == newEvalScreen {
+			switch state.benchmarkFamily {
+			case "all":
+				state.benchmarkFamily = "generic"
+			case "generic":
+				state.benchmarkFamily = "coding"
+			default:
+				state.benchmarkFamily = "all"
+			}
+			state.benchmarkOffset = 0
+			state.newEvalIndex = 0
+		}
+	case "/":
+		if state.backend && state.screen == newEvalScreen {
+			state.filterInput = true
+		}
 	case "r":
 		if state.screen == errorScreen {
 			state.screen = confirmScreen
@@ -1114,12 +1253,25 @@ func nextState(state appState, key string) (appState, bool) {
 		}
 		if state.screen == traceScreen && state.traceIndex > 0 {
 			state.traceIndex--
+			if state.backend && state.traceIndex < state.traceOffset {
+				state.traceOffset = max(0, state.traceOffset-pageSize(state))
+			}
 		}
-		if state.screen == runsScreen && state.runIndex > 0 {
-			state.runIndex--
+		if state.screen == runsScreen {
+			if state.runIndex > 0 {
+				state.runIndex--
+			} else if state.backend && state.runOffset > 0 {
+				state.runOffset = max(0, state.runOffset-pageSize(state))
+				state.runIndex = pageSize(state) - 1
+			}
 		}
-		if state.screen == newEvalScreen && state.newEvalIndex > 0 {
-			state.newEvalIndex--
+		if state.screen == newEvalScreen {
+			if state.newEvalIndex > 0 {
+				state.newEvalIndex--
+			} else if state.backend && state.benchmarkOffset > 0 {
+				state.benchmarkOffset = max(0, state.benchmarkOffset-pageSize(state))
+				state.newEvalIndex = pageSize(state) - 1
+			}
 		}
 		if state.screen == searchScreen && state.searchIndex > 0 {
 			state.searchIndex--
@@ -1133,18 +1285,34 @@ func nextState(state appState, key string) (appState, bool) {
 		if state.screen == errorScreen && state.errorIndex > 0 {
 			state.errorIndex--
 		}
+		if state.backend && state.screen == compareScreen && state.comparisonOffset > 0 {
+			state.comparisonOffset = max(0, state.comparisonOffset-pageSize(state))
+		}
 	case "down":
 		if state.screen == homeScreen && state.homeIndex < 4 {
 			state.homeIndex++
 		}
 		if state.screen == traceScreen && state.traceIndex < traceLimit(state)-1 {
 			state.traceIndex++
+			if state.backend && state.traceIndex >= state.traceOffset+pageSize(state) {
+				state.traceOffset += pageSize(state)
+			}
 		}
-		if state.screen == runsScreen && state.runIndex < runLimit(state)-1 {
-			state.runIndex++
+		if state.screen == runsScreen {
+			if state.runIndex < runLimit(state)-1 {
+				state.runIndex++
+			} else if state.backend && state.runOffset+len(state.runs) < state.runTotal {
+				state.runOffset += len(state.runs)
+				state.runIndex = 0
+			}
 		}
-		if state.screen == newEvalScreen && state.newEvalIndex < benchmarkLimit(state)-1 {
-			state.newEvalIndex++
+		if state.screen == newEvalScreen {
+			if state.newEvalIndex < benchmarkLimit(state)-1 {
+				state.newEvalIndex++
+			} else if state.backend && state.benchmarkOffset+len(state.benchmarks) < state.benchmarkTotal {
+				state.benchmarkOffset += len(state.benchmarks)
+				state.newEvalIndex = 0
+			}
 		}
 		if state.screen == searchScreen && state.searchIndex < 2 {
 			state.searchIndex++
@@ -1157,6 +1325,41 @@ func nextState(state appState, key string) (appState, bool) {
 		}
 		if state.screen == errorScreen && state.errorIndex < 1 {
 			state.errorIndex++
+		}
+		if state.backend && state.screen == compareScreen && state.comparison != nil && state.comparison.Offset+len(state.comparison.Metrics) < state.comparison.Total {
+			state.comparisonOffset += len(state.comparison.Metrics)
+		}
+	case "pageup":
+		if state.backend && state.screen == runsScreen {
+			state.runOffset = max(0, state.runOffset-pageSize(state))
+			state.runIndex = 0
+		}
+		if state.backend && state.screen == traceScreen {
+			state.traceOffset = max(0, state.traceOffset-pageSize(state))
+			state.traceIndex = state.traceOffset
+		}
+		if state.backend && state.screen == newEvalScreen {
+			state.benchmarkOffset = max(0, state.benchmarkOffset-pageSize(state))
+			state.newEvalIndex = 0
+		}
+		if state.backend && state.screen == compareScreen {
+			state.comparisonOffset = max(0, state.comparisonOffset-pageSize(state))
+		}
+	case "pagedown":
+		if state.backend && state.screen == runsScreen && state.runOffset+len(state.runs) < state.runTotal {
+			state.runOffset += len(state.runs)
+			state.runIndex = 0
+		}
+		if state.backend && state.screen == traceScreen && state.traceIndex+1 < traceLimit(state) {
+			state.traceOffset += pageSize(state)
+			state.traceIndex = state.traceOffset
+		}
+		if state.backend && state.screen == newEvalScreen && state.benchmarkOffset+len(state.benchmarks) < state.benchmarkTotal {
+			state.benchmarkOffset += len(state.benchmarks)
+			state.newEvalIndex = 0
+		}
+		if state.backend && state.screen == compareScreen && state.comparison != nil && state.comparison.Offset+len(state.comparison.Metrics) < state.comparison.Total {
+			state.comparisonOffset += len(state.comparison.Metrics)
 		}
 	}
 	return state, false
@@ -1174,7 +1377,7 @@ func runLimit(state appState) int {
 func traceLimit(state appState) int {
 	if state.backend {
 		if state.detail != nil {
-			return len(state.detail.Events)
+			return state.detail.EventTotal
 		}
 		return len(state.progress)
 	}
@@ -1199,6 +1402,9 @@ func readKey(reader *bufio.Reader) (string, error) {
 		if first == '\r' || first == '\n' {
 			return "enter", nil
 		}
+		if first == 8 || first == 127 {
+			return "backspace", nil
+		}
 		return string(first), nil
 	}
 	second, err := reader.ReadByte()
@@ -1214,6 +1420,13 @@ func readKey(reader *bufio.Reader) (string, error) {
 	}
 	if third == 'B' {
 		return "down", nil
+	}
+	if third == '5' || third == '6' {
+		_, _ = reader.ReadByte()
+		if third == '5' {
+			return "pageup", nil
+		}
+		return "pagedown", nil
 	}
 	return "escape", nil
 }
@@ -1240,6 +1453,41 @@ func runInteractive(state appState, input io.Reader, output io.Writer) error {
 	}
 }
 
+type keyUpdate struct {
+	key string
+	err error
+}
+
+// キー入力を非同期に受け取る
+func readKeys(reader *bufio.Reader) <-chan keyUpdate {
+	updates := make(chan keyUpdate, 1)
+	go func() {
+		for {
+			key, err := readKey(reader)
+			updates <- keyUpdate{key: key, err: err}
+			if err != nil {
+				close(updates)
+				return
+			}
+		}
+	}()
+	return updates
+}
+
+// 画面更新にDB取得が必要か調べる
+func needsBackendRefresh(before appState, after appState, key string) bool {
+	if after.filterInput {
+		return false
+	}
+	return key == "r" || before.screen != after.screen ||
+		before.runOffset != after.runOffset ||
+		before.traceOffset != after.traceOffset ||
+		before.benchmarkOffset != after.benchmarkOffset ||
+		before.benchmarkFamily != after.benchmarkFamily ||
+		before.benchmarkQuery != after.benchmarkQuery ||
+		before.comparisonOffset != after.comparisonOffset
+}
+
 // raw modeで対話表示する
 func runTerminal(state appState) error {
 	fileDescriptor := int(os.Stdin.Fd())
@@ -1263,33 +1511,43 @@ func runTerminal(state appState) error {
 	defer term.Restore(fileDescriptor, originalState)
 	fmt.Fprint(os.Stdout, alternateScreenStart)
 	defer fmt.Fprint(os.Stdout, resetStyle, alternateScreenEnd)
-	reader := bufio.NewReader(os.Stdin)
-	hasRendered := false
+	keys := readKeys(bufio.NewReader(os.Stdin))
+	var updates <-chan runUpdate
+	var cancelRun context.CancelFunc
 	for {
 		width, height, sizeErr := term.GetSize(fileDescriptor)
 		if sizeErr == nil {
 			state.width = width
 			state.height = height
 		}
-		if hasRendered {
-			state.noClear = false
-		}
 		if err := render(state, os.Stdout); err != nil {
 			return err
 		}
-		hasRendered = true
-		key, err := readKey(reader)
-		if err != nil {
-			return err
-		}
-		var done bool
-		startRun := state.backend && state.screen == confirmScreen && state.confirmIndex == 1 && (key == "enter" || key == "y")
-		retryBackend := state.backend && state.screen == errorScreen && key == "r"
-		state, done = nextState(state, key)
-		if done {
-			return nil
-		}
-		if client != nil {
+		state.noClear = false
+		select {
+		case input, open := <-keys:
+			if !open || input.err != nil {
+				return input.err
+			}
+			if state.running && input.key == "q" {
+				cancelRun()
+				state.cancelling = true
+				continue
+			}
+			if state.running {
+				continue
+			}
+			before := state
+			startRun := state.backend && state.screen == confirmScreen && state.confirmIndex == 1 && (input.key == "enter" || input.key == "y")
+			retryBackend := state.backend && state.screen == errorScreen && input.key == "r"
+			var done bool
+			state, done = nextState(state, input.key)
+			if done {
+				return nil
+			}
+			if client == nil {
+				continue
+			}
 			if retryBackend {
 				if err := client.migrate(context.Background()); err != nil {
 					setBackendError(&state, "migration", err)
@@ -1299,8 +1557,39 @@ func runTerminal(state appState) error {
 					refreshBackendState(&state, *client)
 				}
 			} else if startRun {
-				startBackendRun(&state, *client, os.Stdout)
-			} else {
+				contextValue, cancel := context.WithCancel(context.Background())
+				cancelRun = cancel
+				updates = startBackendRunAsync(contextValue, &state, *client)
+			} else if needsBackendRefresh(before, state, input.key) {
+				refreshBackendState(&state, *client)
+			}
+		case update, open := <-updates:
+			if !open {
+				updates = nil
+				continue
+			}
+			if update.progress != nil {
+				state.progress = append(state.progress, *update.progress)
+				state.traceIndex = len(state.progress) - 1
+				if state.traceIndex >= state.traceOffset+pageSize(state) {
+					state.traceOffset = state.traceIndex - pageSize(state) + 1
+				}
+				continue
+			}
+			state.running = false
+			if update.err != nil {
+				if state.cancelling {
+					return nil
+				}
+				setBackendError(&state, "bridge", update.err)
+				continue
+			}
+			if update.result != nil {
+				state.runOffset = 0
+				state.runIndex = 0
+				state.traceOffset = 0
+				state.traceIndex = 0
+				state.screen = detailScreen
 				refreshBackendState(&state, *client)
 			}
 		}

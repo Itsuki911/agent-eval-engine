@@ -5,7 +5,7 @@
 実行コマンド:
 
 ```powershell
-docker compose --profile cli run --rm --entrypoint "go test -v -run TestRenderTraceAmberPaletteRegression ./..." cli
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run TestRenderTraceAmberPaletteRegression ./...'
 ```
 
 1. 実行コマンドを実行する。
@@ -18,7 +18,7 @@ docker compose --profile cli run --rm --entrypoint "go test -v -run TestRenderTr
 実行コマンド:
 
 ```powershell
-docker compose --profile cli run --rm --entrypoint "go test -v -run TestRunsEnterOpensDetailScreen ./..." cli
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run TestRunsEnterOpensDetailScreen ./...'
 ```
 
 1. 実行コマンドを実行する。
@@ -31,7 +31,7 @@ docker compose --profile cli run --rm --entrypoint "go test -v -run TestRunsEnte
 実行コマンド:
 
 ```powershell
-docker compose --profile cli run --rm --entrypoint "go test -v -run TestHomeNumberKeysNavigateDirectly ./..." cli
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run TestHomeNumberKeysNavigateDirectly ./...'
 ```
 
 1. 実行コマンドを実行する。

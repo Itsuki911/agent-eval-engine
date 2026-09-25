@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"strings"
 	"testing"
@@ -61,7 +62,7 @@ func TestBackendRenderRunsUsesDatabaseValues(t *testing.T) {
 	if err := render(state, &output); err != nil {
 		t.Fatalf("render returned error: %v", err)
 	}
-	for _, expected := range []string{"PostgreSQLの実行履歴 (1件)", "GEN-TOOL-001", "simulated", "$0.01230000"} {
+	for _, expected := range []string{"PostgreSQLの実行履歴 1-1 / 1", "GEN-TOOL-001", "simulated", "$0.01230000"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("missing database value: %s", expected)
 		}
@@ -132,5 +133,104 @@ func TestBackendDetailPrefersEvaluationStatus(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "status: simulated") {
 		t.Fatal("evaluation status was not rendered")
+	}
+}
+
+// benchmark一覧をページ単位で描画する
+func TestBackendNewEvaluationShowsSinglePage(t *testing.T) {
+	benchmarks := make([]backendBenchmark, 5)
+	for index := range benchmarks {
+		benchmarks[index] = backendBenchmark{ID: "GEN-TOOL-00" + string(rune('1'+index)), Title: "候補"}
+	}
+	state := appState{
+		backend:        true,
+		noClear:        true,
+		screen:         newEvalScreen,
+		height:         24,
+		benchmarks:     benchmarks,
+		benchmarkTotal: 281,
+	}
+	var output bytes.Buffer
+	if err := render(state, &output); err != nil {
+		t.Fatalf("render returned error: %v", err)
+	}
+	if !strings.Contains(output.String(), "候補 1-5 / 281") {
+		t.Fatal("benchmark page information was not rendered")
+	}
+}
+
+// benchmark境界で次ページへ移動する
+func TestBackendBenchmarkSelectionMovesToNextPage(t *testing.T) {
+	state := appState{
+		backend:         true,
+		screen:          newEvalScreen,
+		height:          24,
+		newEvalIndex:    4,
+		benchmarks:      make([]backendBenchmark, 5),
+		benchmarkTotal:  10,
+		benchmarkOffset: 0,
+	}
+	next, done := nextState(state, "down")
+	if done || next.benchmarkOffset != 5 || next.newEvalIndex != 0 {
+		t.Fatalf("expected next page, got offset=%d index=%d", next.benchmarkOffset, next.newEvalIndex)
+	}
+}
+
+// 実行中のTraceに中止案内を表示する
+func TestBackendTraceShowsCancelGuideWhileRunning(t *testing.T) {
+	state := appState{
+		backend:  true,
+		noClear:  true,
+		screen:   traceScreen,
+		running:  true,
+		progress: []backendProgress{{Sequence: 1, EventType: "benchmark_loaded"}},
+	}
+	var output bytes.Buffer
+	if err := render(state, &output); err != nil {
+		t.Fatalf("render returned error: %v", err)
+	}
+	if !strings.Contains(output.String(), "q で中止できます") {
+		t.Fatal("cancel guide was not rendered")
+	}
+}
+
+// 中止要求中の状態を表示する
+func TestBackendTraceShowsCancellationState(t *testing.T) {
+	state := appState{
+		backend:    true,
+		noClear:    true,
+		screen:     traceScreen,
+		running:    true,
+		cancelling: true,
+		progress:   []backendProgress{{Sequence: 1, EventType: "benchmark_loaded"}},
+	}
+	var output bytes.Buffer
+	if err := render(state, &output); err != nil {
+		t.Fatalf("render returned error: %v", err)
+	}
+	if !strings.Contains(output.String(), "評価を中止しています") {
+		t.Fatal("cancellation state was not rendered")
+	}
+}
+
+// 非同期キー入力を受け取る
+func TestReadKeysReceivesInputAsynchronously(t *testing.T) {
+	updates := readKeys(bufio.NewReader(strings.NewReader("q")))
+	update := <-updates
+	if update.key != "q" || update.err != nil {
+		t.Fatalf("unexpected key update: %+v", update)
+	}
+}
+
+// ページ移動時だけbackendを更新する
+func TestNeedsBackendRefreshForPageChange(t *testing.T) {
+	before := appState{screen: newEvalScreen, backend: true, benchmarkOffset: 0}
+	after := before
+	after.benchmarkOffset = 5
+	if !needsBackendRefresh(before, after, "down") {
+		t.Fatal("page change must refresh backend data")
+	}
+	if needsBackendRefresh(before, before, "down") {
+		t.Fatal("selection inside a page must not refresh backend data")
 	}
 }

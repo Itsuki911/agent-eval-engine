@@ -28,7 +28,7 @@ class Run(Base):
     final_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     failure_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     llm_cost_usd: Mapped[float | None] = mapped_column(Numeric(20, 8), nullable=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     events: Mapped[list["Event"]] = relationship(back_populates="run", cascade="all, delete-orphan", order_by="Event.sequence")

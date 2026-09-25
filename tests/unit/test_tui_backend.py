@@ -59,9 +59,36 @@ def test_list_benchmarks_returns_supported_families() -> None:
     output = tui_backend.list_benchmarks()
 
     assert output["benchmarks"]
+    assert output["limit"] == 12
+    assert output["total"] >= len(output["benchmarks"])
     assert {row["family"] for row in output["benchmarks"]} <= {"generic", "coding"}
     assert all(row["path"].startswith("benchmarks/") for row in output["benchmarks"])
+    assert all(not row["path"].endswith("/index.yaml") for row in output["benchmarks"])
     print(json.dumps({"test": "benchmarks", "count": len(output["benchmarks"]), "families": ["generic", "coding"]}))
+
+
+# benchmark候補をページ単位で取得する
+def test_list_benchmarks_returns_requested_page() -> None:
+    first_page = tui_backend.list_benchmarks(limit=3, offset=0)
+    second_page = tui_backend.list_benchmarks(limit=3, offset=3)
+
+    assert len(first_page["benchmarks"]) == 3
+    assert len(second_page["benchmarks"]) == 3
+    assert first_page["offset"] == 0
+    assert second_page["offset"] == 3
+    assert {row["id"] for row in first_page["benchmarks"]}.isdisjoint(
+        {row["id"] for row in second_page["benchmarks"]}
+    )
+    print(json.dumps({"test": "benchmark_page", "first_count": 3, "second_offset": 3}))
+
+
+# ID検索で候補を絞り込む
+def test_list_benchmarks_filters_by_id() -> None:
+    output = tui_backend.list_benchmarks(query="GEN-TOOL", limit=50)
+
+    assert output["benchmarks"]
+    assert all(row["id"].startswith("GEN-TOOL") for row in output["benchmarks"])
+    print(json.dumps({"test": "benchmark_filter", "total": output["total"], "query": "GEN-TOOL"}))
 
 
 # 比較指標の差分を作る

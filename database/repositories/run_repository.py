@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from database.models import Evaluation, Event, Metric, Run
@@ -150,17 +150,47 @@ class RunRepository:
         return self.session.scalar(statement)
 
     # 新しい順で実行一覧を取得する
-    def list_runs(self, limit: int = 100) -> list[Run]:
-        statement = select(Run).order_by(desc(Run.started_at)).limit(limit)
+    def list_runs(self, limit: int = 100, offset: int = 0) -> list[Run]:
+        page_limit = min(max(limit, 1), 100)
+        page_offset = max(offset, 0)
+        statement = select(Run).order_by(desc(Run.started_at)).limit(page_limit).offset(page_offset)
         return list(self.session.scalars(statement))
 
+    # 実行履歴の総数を返す
+    def count_runs(self) -> int:
+        return self.session.scalar(select(func.count()).select_from(Run)) or 0
+
     # 詳細画面向けの値を取得する
-    def get_run_details(self, run_id: UUID) -> dict[str, Any]:
-        run = self.get_run(run_id)
+    def get_run_details(self, run_id: UUID, event_limit: int = 20, event_offset: int = 0) -> dict[str, Any]:
+        statement = (
+            select(Run)
+            .where(Run.id == run_id)
+            .options(selectinload(Run.metrics), selectinload(Run.evaluations))
+        )
+        run = self.session.scalar(statement)
         if run is None:
             raise ValueError(f"run not found: {run_id}")
-        history = self.reconstruct_history(run_id)
-        history["metrics"] = [
+        page_limit = min(max(event_limit, 1), 100)
+        page_offset = max(event_offset, 0)
+        return {
+            "run_id": str(run.id),
+            "benchmark_id": run.benchmark_id,
+            "status": run.status,
+            "agent_name": run.agent_name,
+            "provider": run.provider,
+            "model": run.model,
+            "architecture": run.architecture,
+            "run_config": run.run_config,
+            "final_state": run.final_state,
+            "failure_category": run.failure_category,
+            "llm_cost_usd": float(run.llm_cost_usd) if run.llm_cost_usd is not None else None,
+            "started_at": run.started_at.isoformat(),
+            "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+            "events": [self.event_output(event) for event in self.list_events(run_id, page_limit, page_offset)],
+            "event_total": self.count_events(run_id),
+            "event_offset": page_offset,
+            "event_limit": page_limit,
+            "metrics": [
             {
                 "category": metric.category,
                 "name": metric.name,
@@ -169,8 +199,8 @@ class RunRepository:
                 "dimensions": metric.dimensions,
             }
             for metric in run.metrics
-        ]
-        history["evaluations"] = [
+            ],
+            "evaluations": [
             {
                 "evaluator_name": evaluation.evaluator_name,
                 "evaluator_version": evaluation.evaluator_version,
@@ -180,8 +210,40 @@ class RunRepository:
                 "findings": evaluation.findings,
             }
             for evaluation in run.evaluations
-        ]
-        return history
+            ],
+        }
+
+    # 実行イベントをページ単位で取得する
+    def list_events(self, run_id: UUID, limit: int = 20, offset: int = 0) -> list[Event]:
+        page_limit = min(max(limit, 1), 100)
+        page_offset = max(offset, 0)
+        statement = (
+            select(Event)
+            .where(Event.run_id == run_id)
+            .order_by(Event.sequence)
+            .limit(page_limit)
+            .offset(page_offset)
+        )
+        return list(self.session.scalars(statement))
+
+    # 実行イベントの総数を返す
+    def count_events(self, run_id: UUID) -> int:
+        return self.session.scalar(select(func.count()).select_from(Event).where(Event.run_id == run_id)) or 0
+
+    # イベントを返却形式へ変換する
+    def event_output(self, event: Event) -> dict[str, Any]:
+        return {
+            "sequence": event.sequence,
+            "event_type": event.event_type,
+            "actor": event.actor,
+            "occurred_at": event.occurred_at.isoformat(),
+            "payload": event.payload,
+            "previous_state": event.previous_state,
+            "next_state": event.next_state,
+            "error": event.error,
+            "trace_id": event.trace_id,
+            "span_id": event.span_id,
+        }
 
     # 実行履歴を再構成する
     def reconstruct_history(self, run_id: UUID) -> dict[str, Any]:
@@ -203,18 +265,7 @@ class RunRepository:
             "started_at": run.started_at.isoformat(),
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
             "events": [
-                {
-                    "sequence": event.sequence,
-                    "event_type": event.event_type,
-                    "actor": event.actor,
-                    "occurred_at": event.occurred_at.isoformat(),
-                    "payload": event.payload,
-                    "previous_state": event.previous_state,
-                    "next_state": event.next_state,
-                    "error": event.error,
-                    "trace_id": event.trace_id,
-                    "span_id": event.span_id,
-                }
+                self.event_output(event)
                 for event in run.events
             ],
         }
