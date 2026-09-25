@@ -132,6 +132,11 @@ def test_events_reconstruct_complete_history(session: Session) -> None:
     # 関連テーブルの保存も確認する
     assert repository.get_run(run.id).metrics[0].name == "task_success"
     assert repository.get_run(run.id).evaluations[0].status == "passed"
+    # TUI向け詳細と一覧を確認する
+    details = repository.get_run_details(run.id)
+    assert details["metrics"][0]["name"] == "task_success"
+    assert details["evaluations"][0]["status"] == "passed"
+    assert repository.list_runs()[0].id == run.id
 
 
 # 重複したイベント順序を拒否する

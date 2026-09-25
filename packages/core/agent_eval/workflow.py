@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Any, TypedDict
+from typing import Any, Callable, TypedDict
 from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
@@ -72,16 +72,23 @@ class EvaluationResult:
 # 評価処理全体を調整する
 class EvaluationService:
     # 依存する設定とDBを受け取る
-    def __init__(self, settings: Phase3Settings, session: Session, agent: AgentRunner | None = None) -> None:
+    def __init__(
+        self,
+        settings: Phase3Settings,
+        session: Session,
+        agent: AgentRunner | None = None,
+        event_listener: Callable[[CollectedEvent], None] | None = None,
+    ) -> None:
         self._settings = settings
         self._repository = RunRepository(session)
         self._telemetry: Telemetry = create_telemetry(settings.telemetry)
         self._agent = agent or build_agent(settings)
+        self._event_listener = event_listener
 
     # benchmarkを評価して保存する
     def run(self, benchmark_path: str | Path) -> EvaluationResult:
         started_at = perf_counter()
-        collector = EventCollector(self._telemetry.tracer)
+        collector = EventCollector(self._telemetry.tracer, self._event_listener)
         graph = self._build_graph()
         with self._telemetry.tracer.start_as_current_span("agent.run"):
             state = graph.invoke(

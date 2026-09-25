@@ -24,3 +24,20 @@ def test_event_collector_adds_trace_context() -> None:
         trace_id_length=len(event.trace_id),
         span_id_length=len(event.span_id),
     )
+
+
+# listenerへ進捗イベントを渡す
+def test_event_collector_notifies_listener() -> None:
+    telemetry = create_telemetry(TelemetrySettings(service_name="test", exporter="none"))
+    received = []
+    collector = EventCollector(telemetry.tracer, received.append)
+
+    event = collector.record("benchmark_loaded", {"benchmark_id": "GEN-TOOL-001"})
+
+    assert received == [event]
+    print_test_result(
+        "event_collector_notifies_listener",
+        "passed",
+        sequence=event.sequence,
+        event_type=event.event_type,
+    )

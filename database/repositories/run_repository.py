@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from database.models import Evaluation, Event, Metric, Run
@@ -148,6 +148,40 @@ class RunRepository:
             )
         )
         return self.session.scalar(statement)
+
+    # 新しい順で実行一覧を取得する
+    def list_runs(self, limit: int = 100) -> list[Run]:
+        statement = select(Run).order_by(desc(Run.started_at)).limit(limit)
+        return list(self.session.scalars(statement))
+
+    # 詳細画面向けの値を取得する
+    def get_run_details(self, run_id: UUID) -> dict[str, Any]:
+        run = self.get_run(run_id)
+        if run is None:
+            raise ValueError(f"run not found: {run_id}")
+        history = self.reconstruct_history(run_id)
+        history["metrics"] = [
+            {
+                "category": metric.category,
+                "name": metric.name,
+                "value": float(metric.value),
+                "unit": metric.unit,
+                "dimensions": metric.dimensions,
+            }
+            for metric in run.metrics
+        ]
+        history["evaluations"] = [
+            {
+                "evaluator_name": evaluation.evaluator_name,
+                "evaluator_version": evaluation.evaluator_version,
+                "status": evaluation.status,
+                "score": float(evaluation.score) if evaluation.score is not None else None,
+                "summary": evaluation.summary,
+                "findings": evaluation.findings,
+            }
+            for evaluation in run.evaluations
+        ]
+        return history
 
     # 実行履歴を再構成する
     def reconstruct_history(self, run_id: UUID) -> dict[str, Any]:

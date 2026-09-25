@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from opentelemetry.trace import Tracer
 
@@ -27,9 +27,10 @@ class CollectedEvent:
 # イベントを順序付きで収集する
 class EventCollector:
     # 収集先とトレーサーを受け取る
-    def __init__(self, tracer: Tracer) -> None:
+    def __init__(self, tracer: Tracer, listener: Callable[[CollectedEvent], None] | None = None) -> None:
         self._tracer = tracer
         self._events: list[CollectedEvent] = []
+        self._listener = listener
 
     # 現在の追跡IDを文字列へ変える
     def _trace_context(self) -> tuple[str | None, str | None]:
@@ -63,6 +64,8 @@ class EventCollector:
             span_id=span_id,
         )
         self._events.append(event)
+        if self._listener is not None:
+            self._listener(event)
         return event
 
     # 収集済みイベントを返す

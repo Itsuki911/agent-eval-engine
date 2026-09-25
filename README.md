@@ -61,6 +61,22 @@ docker compose --profile engine run --rm engine python scripts/run_evaluation.py
 
 `configs/phase3-local.yaml`の`engine.dry_run`を`false`へ変更し、`.env`の`OPENROUTER_API_KEY`に有効なキーを設定してから同じコマンドを実行します。実行時はAPI費用が発生する可能性があります。Phase 3ではツール・workspaceを実行しないため、`simulated`は実ツール評価の結果ではありません。
 
+## Phase 4: Go TUIと評価エンジンの統合
+
+TUIのモック表示だけを確認する場合は、次を実行します。DB、Python評価エンジン、LLM APIは使用しません。
+
+```bash
+docker compose --profile cli run --rm --build cli
+```
+
+PostgreSQLに保存された実行履歴の表示、Python評価エンジンによる評価開始、実行イベントのTimeline表示を確認する場合は、統合TUIを実行します。起動時にDB migrationを確認・適用します。
+
+```bash
+docker compose --profile tui run --rm --build tui
+```
+
+統合TUIはGoからPython subprocessを呼び出し、Pythonが評価・DB操作を担当します。初期設定ではdry-runのため外部APIを呼びません。`configs/phase3-local.yaml`の`engine.dry_run`を`false`へ変更した場合だけ、確認画面からの実行でOpenRouter APIを使用します。
+
 ## はじめ方
 
 ```bash

@@ -3,6 +3,8 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -59,6 +61,13 @@ type appState struct {
 	errorIndex   int
 	width        int
 	height       int
+	backend      bool
+	runs         []backendRun
+	detail       *backendDetail
+	benchmarks   []backendBenchmark
+	comparison   *backendComparison
+	progress     []backendProgress
+	backendError string
 }
 
 // 指定色の文字列を返す
@@ -76,6 +85,7 @@ func parseFlags() appState {
 	screen := flag.String("screen", "home", "表示する画面")
 	errorKind := flag.String("demo-error", "", "migration, bridge, openrouter")
 	noClear := flag.Bool("no-clear", false, "画面消去を無効化")
+	backend := flag.Bool("backend", os.Getenv("AGENT_EVAL_BACKEND") != "0", "Python評価エンジンを使う")
 	flag.Parse()
 
 	initialScreen := screenName(*screen)
@@ -87,6 +97,7 @@ func parseFlags() appState {
 		errorKind:  *errorKind,
 		noClear:    *noClear,
 		traceIndex: 2,
+		backend:    *backend,
 	}
 }
 
@@ -102,19 +113,47 @@ func render(state appState, output io.Writer) error {
 	case homeScreen:
 		content = renderHome(state.homeIndex)
 	case runsScreen:
-		content = renderRuns(state.runIndex)
+		if state.backend {
+			content = renderBackendRuns(state)
+		} else {
+			content = renderRuns(state.runIndex)
+		}
 	case detailScreen:
-		content = renderDetail(state.detailIndex)
+		if state.backend {
+			content = renderBackendDetail(state)
+		} else {
+			content = renderDetail(state.detailIndex)
+		}
 	case traceScreen:
-		content = renderTrace(state.traceIndex)
+		if state.backend {
+			content = renderBackendTrace(state)
+		} else {
+			content = renderTrace(state.traceIndex)
+		}
 	case compareScreen:
-		content = renderCompare()
+		if state.backend {
+			content = renderBackendCompare(state)
+		} else {
+			content = renderCompare()
+		}
 	case confirmScreen:
-		content = renderConfirm(state.confirmIndex)
+		if state.backend {
+			content = renderBackendConfirm(state)
+		} else {
+			content = renderConfirm(state.confirmIndex)
+		}
 	case errorScreen:
-		content = renderError(state.errorKind, state.errorIndex)
+		if state.backend && state.backendError != "" {
+			content = renderBackendError(state)
+		} else {
+			content = renderError(state.errorKind, state.errorIndex)
+		}
 	case newEvalScreen:
-		content = renderNewEvaluation(state.newEvalIndex)
+		if state.backend {
+			content = renderBackendNewEvaluation(state)
+		} else {
+			content = renderNewEvaluation(state.newEvalIndex)
+		}
 	case searchScreen:
 		content = renderSearch(state.searchIndex)
 	case helpScreen:
@@ -385,6 +424,332 @@ func renderRuns(selectedIndex int) string {
 	}, "\n") + "\n"
 }
 
+// DB実行一覧を画面用に整える
+func renderBackendRuns(state appState) string {
+	if len(state.runs) == 0 {
+		return strings.Join([]string{
+			paint(cyanStyle, "EVALUATION RESULTS"),
+			paint(slateStyle, "保存済みの実行はありません。"),
+			paint(purpleStyle, "新しい評価を開始するからdry-runを実行してください。"),
+			paint(cyanStyle, divider),
+			paint(blueStyle, "b 戻る     q 終了"),
+		}, "\n") + "\n"
+	}
+	rows := make([]string, 0, len(state.runs)*3)
+	for index, run := range state.runs {
+		status := paint(slateStyle, run.Status)
+		if run.Status == "completed" || run.Status == "simulated" {
+			status = paint(greenStyle, "✓ "+run.Status)
+		}
+		if run.Status == "failed" {
+			status = paint(redStyle, "✕ "+run.Status)
+		}
+		cost := "料金なし"
+		if run.CostUSD != nil {
+			cost = fmt.Sprintf("$%.8f", *run.CostUSD)
+		}
+		line := fmt.Sprintf("  %s  %s", run.Benchmark, status)
+		if index == state.runIndex {
+			line = selected("> "+run.Benchmark+"  "+run.Status)
+		}
+		rows = append(rows, line, paint(slateStyle, "    "+run.StartedAt+"  |  "+run.Model+"  |  "+cost), "")
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "EVALUATION RESULTS"),
+		paint(slateStyle, fmt.Sprintf("PostgreSQLの実行履歴 (%d件)", len(state.runs))),
+		paint(cyanStyle, divider),
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択     Enter 詳細     t Trace     c 比較     r 更新     b 戻る     q 終了"))...), "\n") + "\n"
+}
+
+// DB実行詳細を画面用に整える
+func renderBackendDetail(state appState) string {
+	if state.detail == nil {
+		return renderBackendLoading("実行詳細を読み込んでいます")
+	}
+	detail := state.detail
+	status := detail.Status
+	if len(detail.Evaluations) > 0 {
+		status = detail.Evaluations[0].Status
+	}
+	cost := "料金なし"
+	if detail.CostUSD != nil {
+		cost = fmt.Sprintf("$%.8f", *detail.CostUSD)
+	}
+	metricLines := make([]string, 0, len(detail.Metrics))
+	for _, metric := range detail.Metrics {
+		metricLines = append(metricLines, paint(slateStyle, fmt.Sprintf("%s.%s: %.2f %s", metric.Category, metric.Name, metric.Value, metric.Unit)))
+	}
+	if len(metricLines) == 0 {
+		metricLines = append(metricLines, paint(slateStyle, "指標はまだありません。"))
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "RUN DETAIL  |  "+detail.RunID),
+		paint(greenStyle, "status: "+status),
+		paint(cyanStyle, divider),
+		paint(purpleStyle, "BENCHMARK  "+detail.Benchmark),
+		paint(purpleStyle, "MODEL      "+detail.Model),
+		paint(purpleStyle, "COST       "+cost),
+		paint(purpleStyle, fmt.Sprintf("EVENTS     %d", len(detail.Events))),
+		paint(cyanStyle, divider),
+		paint(purpleStyle, "評価指標"),
+	}, append(metricLines, paint(cyanStyle, divider), paint(blueStyle, "t Trace     c 比較     r 更新     b 一覧へ戻る     q 終了"))...), "\n") + "\n"
+}
+
+// DBイベントを画面用に整える
+func renderBackendTrace(state appState) string {
+	events := state.progress
+	if state.detail != nil {
+		events = make([]backendProgress, len(state.detail.Events))
+		for index, event := range state.detail.Events {
+			events[index] = backendProgress{Type: "progress", Sequence: event.Sequence, EventType: event.EventType, Status: "saved"}
+		}
+	}
+	if len(events) == 0 {
+		return renderBackendLoading("実行イベントを待っています")
+	}
+	index := state.traceIndex
+	if index < 0 || index >= len(events) {
+		index = len(events) - 1
+	}
+	rows := make([]string, 0, len(events))
+	for eventIndex, event := range events {
+		line := fmt.Sprintf("  %03d  %s  %s", event.Sequence, event.EventType, event.Status)
+		if eventIndex == index {
+			line = selected("> "+line)
+		} else {
+			line = paint(slateStyle, line)
+		}
+		rows = append(rows, line)
+	}
+	detailLines := []string{paint(slateStyle, "進捗イベントを選択しています。")}
+	if state.detail != nil && index < len(state.detail.Events) {
+		event := state.detail.Events[index]
+		detailLines = []string{
+			paint(purpleStyle, fmt.Sprintf("EVENT %03d / %s", event.Sequence, event.EventType)),
+			paint(slateStyle, "actor: "+event.Actor),
+			paint(slateStyle, "payload: "+formatPayload(event.Payload)),
+		}
+		if len(event.Error) > 0 {
+			detailLines = append(detailLines, paint(redStyle, "error: "+formatPayload(event.Error)))
+		}
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "TRACE  |  PostgreSQL events"),
+		paint(cyanStyle, divider),
+		paint(purpleStyle, "処理の流れ (Timeline)"),
+	}, append(rows, "", paint(cyanStyle, "SELECTED EVENT"))...), "\n") + "\n" + strings.Join(append(detailLines,
+		paint(cyanStyle, divider),
+		paint(blueStyle, "↑↓ 移動     r 更新     b 戻る     q 終了"),
+	), "\n") + "\n"
+}
+
+// backend読込中の画面を返す
+func renderBackendLoading(message string) string {
+	return strings.Join([]string{
+		paint(cyanStyle, "AGENT EVAL"),
+		paint(amberStyle, message),
+		paint(slateStyle, "DBまたはPython評価エンジンへ接続しています。"),
+		paint(cyanStyle, divider),
+		paint(blueStyle, "q 終了"),
+	}, "\n") + "\n"
+}
+
+// backend失敗内容を画面用に整える
+func renderBackendError(state appState) string {
+	return strings.Join([]string{
+		paint(redStyle, "BACKEND ERROR  |  "+state.errorKind),
+		paint(cyanStyle, divider),
+		paint(redStyle, "Python評価エンジンまたはDBへ接続できませんでした。"),
+		paint(slateStyle, state.backendError),
+		paint(amberStyle, "r 再試行     b 一覧へ戻る     q 終了"),
+	}, "\n") + "\n"
+}
+
+// backendのbenchmark候補を表示する
+func renderBackendNewEvaluation(state appState) string {
+	if len(state.benchmarks) == 0 {
+		return renderBackendLoading("benchmark候補を読み込んでいます")
+	}
+	rows := make([]string, 0, len(state.benchmarks)*2)
+	for index, benchmark := range state.benchmarks {
+		line := "  " + benchmark.ID + "  " + benchmark.Title
+		if index == state.newEvalIndex {
+			line = selected("> "+benchmark.ID+"  "+benchmark.Title)
+		} else {
+			line = paint(backgroundStyle, line)
+		}
+		rows = append(rows, line, paint(slateStyle, "    "+benchmark.Family+"  |  "+benchmark.Path))
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "NEW EVALUATION"),
+		paint(slateStyle, "PostgreSQLへ保存する評価を開始します。"),
+		paint(cyanStyle, divider),
+		paint(purpleStyle, "STEP 1 / 2   benchmarkを選択"),
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "↑↓ 選択     Enter 確認     b 戻る     q 終了"))...), "\n") + "\n"
+}
+
+// backend実行確認を画面用に整える
+func renderBackendConfirm(state appState) string {
+	if len(state.benchmarks) == 0 {
+		return renderBackendLoading("benchmark候補を読み込んでいます")
+	}
+	benchmark := state.benchmarks[state.newEvalIndex]
+	options := []string{"Cancel (安全に中止する)", "Run evaluation (現在の設定で実行する)"}
+	rows := make([]string, len(options))
+	for index, option := range options {
+		rows[index] = menuOption(index, state.confirmIndex, option, "Enterで決定")
+	}
+	return strings.Join([]string{
+		paint(cyanStyle, "EVALUATION / CONFIRM"),
+		paint(cyanStyle, divider),
+		paint(purpleStyle, "BENCHMARK   "+benchmark.ID),
+		paint(slateStyle, benchmark.Title),
+		paint(amberStyle, "現在の設定を使用します。dry-runなら外部APIは呼びません。"),
+		"",
+		rows[0],
+		rows[1],
+		paint(cyanStyle, divider),
+		paint(blueStyle, "↑↓ 選択     Enter 決定     b 戻る     q 終了"),
+	}, "\n") + "\n"
+}
+
+// backend比較結果を画面用に整える
+func renderBackendCompare(state appState) string {
+	if state.comparison == nil {
+		if len(state.runs) < 2 {
+			return strings.Join([]string{
+				paint(cyanStyle, "COMPARE"),
+				paint(amberStyle, "比較には保存済み実行が2件以上必要です。"),
+				paint(blueStyle, "b 一覧へ戻る     q 終了"),
+			}, "\n") + "\n"
+		}
+		return renderBackendLoading("比較結果を読み込んでいます")
+	}
+	rows := make([]string, 0, len(state.comparison.Metrics))
+	for _, metric := range state.comparison.Metrics {
+		left := "-"
+		right := "-"
+		if metric.Left != nil {
+			left = fmt.Sprintf("%.2f", *metric.Left)
+		}
+		if metric.Right != nil {
+			right = fmt.Sprintf("%.2f", *metric.Right)
+		}
+		rows = append(rows, paint(slateStyle, fmt.Sprintf("%s  |  %s → %s  |  %+.2f", metric.Name, left, right, metric.Difference)))
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "COMPARE  |  "+state.comparison.LeftRunID+" ↔ "+state.comparison.RightRunID),
+		paint(cyanStyle, divider),
+	}, append(rows, paint(cyanStyle, divider), paint(blueStyle, "b 一覧へ戻る     q 終了"))...), "\n") + "\n"
+}
+
+// JSON payloadを短く表示する
+func formatPayload(payload map[string]any) string {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "表示できません"
+	}
+	text := string(encoded)
+	if len(text) > 160 {
+		return text[:160] + "..."
+	}
+	return text
+}
+
+// backend画面のデータを更新する
+func refreshBackendState(state *appState, client backendClient) {
+	contextValue := context.Background()
+	if state.screen == runsScreen || state.screen == detailScreen || state.screen == traceScreen || state.screen == compareScreen {
+		runs, err := client.listRuns(contextValue)
+		if err != nil {
+			setBackendError(state, "bridge", err)
+			return
+		}
+		state.runs = runs
+		if state.runIndex >= len(state.runs) {
+			state.runIndex = max(0, len(state.runs)-1)
+		}
+	}
+	if state.screen == newEvalScreen {
+		benchmarks, err := client.listBenchmarks(contextValue)
+		if err != nil {
+			setBackendError(state, "bridge", err)
+			return
+		}
+		state.benchmarks = benchmarks
+		if state.newEvalIndex >= len(state.benchmarks) {
+			state.newEvalIndex = max(0, len(state.benchmarks)-1)
+		}
+	}
+	if (state.screen == detailScreen || state.screen == traceScreen) && len(state.runs) > 0 {
+		detail, err := client.showRun(contextValue, state.runs[state.runIndex].RunID)
+		if err != nil {
+			setBackendError(state, "bridge", err)
+			return
+		}
+		state.detail = &detail
+		if state.traceIndex >= len(detail.Events) {
+			state.traceIndex = max(0, len(detail.Events)-1)
+		}
+	}
+	if state.screen == compareScreen && len(state.runs) >= 2 {
+		comparison, err := client.compare(contextValue, state.runs[0].RunID, state.runs[1].RunID)
+		if err != nil {
+			setBackendError(state, "bridge", err)
+			return
+		}
+		state.comparison = &comparison
+	}
+}
+
+// backend失敗画面へ遷移する
+func setBackendError(state *appState, kind string, err error) {
+	state.screen = errorScreen
+	state.errorKind = kind
+	state.backendError = "安全のため詳細は標準エラーへ出力しました。"
+}
+
+// 選択benchmarkを評価実行する
+func startBackendRun(state *appState, client backendClient, output io.Writer) {
+	if len(state.benchmarks) == 0 {
+		setBackendError(state, "bridge", fmt.Errorf("benchmark is not selected"))
+		return
+	}
+	benchmark := state.benchmarks[state.newEvalIndex]
+	state.progress = nil
+	state.detail = nil
+	state.screen = traceScreen
+	result, err := client.run(context.Background(), benchmark.Path, func(progress backendProgress) {
+		state.progress = append(state.progress, progress)
+		state.traceIndex = max(0, len(state.progress)-1)
+		_ = render(*state, output)
+	})
+	if err != nil {
+		setBackendError(state, "bridge", err)
+		return
+	}
+	runs, err := client.listRuns(context.Background())
+	if err != nil {
+		setBackendError(state, "bridge", err)
+		return
+	}
+	state.runs = runs
+	for index, run := range runs {
+		if run.RunID == result.RunID {
+			state.runIndex = index
+			break
+		}
+	}
+	detail, err := client.showRun(context.Background(), result.RunID)
+	if err != nil {
+		setBackendError(state, "bridge", err)
+		return
+	}
+	state.detail = &detail
+	state.traceIndex = max(0, len(detail.Events)-1)
+	state.screen = detailScreen
+}
+
 // 詳細画面を作成する
 func renderDetail(selectedIndex int) string {
 	options := []string{"Traceで処理を見る", "実行結果を比較する", "実行一覧へ戻る"}
@@ -628,6 +993,9 @@ func nextState(state appState, key string) (appState, bool) {
 	if key == "q" {
 		return state, true
 	}
+	if key == "r" && state.backend && state.screen != errorScreen {
+		return state, false
+	}
 	switch key {
 	case "enter":
 		switch state.screen {
@@ -769,13 +1137,13 @@ func nextState(state appState, key string) (appState, bool) {
 		if state.screen == homeScreen && state.homeIndex < 4 {
 			state.homeIndex++
 		}
-		if state.screen == traceScreen && state.traceIndex < 5 {
+		if state.screen == traceScreen && state.traceIndex < traceLimit(state)-1 {
 			state.traceIndex++
 		}
-		if state.screen == runsScreen && state.runIndex < 2 {
+		if state.screen == runsScreen && state.runIndex < runLimit(state)-1 {
 			state.runIndex++
 		}
-		if state.screen == newEvalScreen && state.newEvalIndex < 1 {
+		if state.screen == newEvalScreen && state.newEvalIndex < benchmarkLimit(state)-1 {
 			state.newEvalIndex++
 		}
 		if state.screen == searchScreen && state.searchIndex < 2 {
@@ -792,6 +1160,33 @@ func nextState(state appState, key string) (appState, bool) {
 		}
 	}
 	return state, false
+}
+
+// 実行一覧の選択上限を返す
+func runLimit(state appState) int {
+	if state.backend {
+		return len(state.runs)
+	}
+	return 3
+}
+
+// Traceの選択上限を返す
+func traceLimit(state appState) int {
+	if state.backend {
+		if state.detail != nil {
+			return len(state.detail.Events)
+		}
+		return len(state.progress)
+	}
+	return 6
+}
+
+// benchmarkの選択上限を返す
+func benchmarkLimit(state appState) int {
+	if state.backend {
+		return len(state.benchmarks)
+	}
+	return 2
 }
 
 // 入力バイト列を操作名へ変換する
@@ -851,6 +1246,16 @@ func runTerminal(state appState) error {
 	if !term.IsTerminal(fileDescriptor) {
 		return runInteractive(state, os.Stdin, os.Stdout)
 	}
+	var client *backendClient
+	if state.backend {
+		value := newBackendClient()
+		client = &value
+		if err := client.migrate(context.Background()); err != nil {
+			setBackendError(&state, "migration", err)
+		} else {
+			refreshBackendState(&state, *client)
+		}
+	}
 	originalState, err := term.MakeRaw(fileDescriptor)
 	if err != nil {
 		return err
@@ -878,9 +1283,26 @@ func runTerminal(state appState) error {
 			return err
 		}
 		var done bool
+		startRun := state.backend && state.screen == confirmScreen && state.confirmIndex == 1 && (key == "enter" || key == "y")
+		retryBackend := state.backend && state.screen == errorScreen && key == "r"
 		state, done = nextState(state, key)
 		if done {
 			return nil
+		}
+		if client != nil {
+			if retryBackend {
+				if err := client.migrate(context.Background()); err != nil {
+					setBackendError(&state, "migration", err)
+				} else {
+					state.screen = homeScreen
+					state.backendError = ""
+					refreshBackendState(&state, *client)
+				}
+			} else if startRun {
+				startBackendRun(&state, *client, os.Stdout)
+			} else {
+				refreshBackendState(&state, *client)
+			}
 		}
 	}
 }
