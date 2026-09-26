@@ -7,16 +7,16 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, TypedDict, cast
 from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
-from agent_eval.agent import AgentRunner, AsyncAgentRunner, build_agent, build_async_agent
+from agent_eval.agent import AgentRunner, AsyncAgentRunner, build_agent
 from agent_eval.benchmark import BenchmarkDefinition, load_benchmark
 from agent_eval.config import Phase3Settings
-from agent_eval.events import EventCollector
+from agent_eval.events import CollectedEvent, EventCollector
 from agent_eval.metrics import ComputedMetric, calculate_metrics
 from agent_eval.openrouter import (
     OpenRouterAuthenticationError,
@@ -96,7 +96,6 @@ class EvaluationService:
             state = graph.invoke(
                 {"benchmark_path": str(benchmark_path), "collector": collector, "started_at": started_at}
             )
-        elapsed_ms = (perf_counter() - started_at) * 1000
         metrics = state["metrics"]
         llm_cost_usd = _live_llm_cost_usd(collector.events())
         self._telemetry.provider.force_flush()
@@ -143,7 +142,6 @@ class EvaluationService:
             self._telemetry.provider.force_flush()
             raise
 
-        elapsed_ms = (perf_counter() - started_at) * 1000
         metrics = state["metrics"]
         llm_cost_usd = _live_llm_cost_usd(collector.events())
         self._telemetry.provider.force_flush()
@@ -262,7 +260,7 @@ class EvaluationService:
             collector = state["collector"]
             collector.record("user_prompt", {"content": state["benchmark"].task.prompt}, actor="user")
         try:
-            result = self._agent.run(state["benchmark"], collector)
+            result = cast(AgentRunner, self._agent).run(state["benchmark"], collector)
             return {"final_state": result.final_state, "failure_category": result.failure_category}
         except OpenRouterError as error:
             category = _map_openrouter_error_category(error)
@@ -326,7 +324,7 @@ class EvaluationService:
             success = bool(state["final_state"].get("success"))
             evaluation_status = "simulated" if state["final_state"].get("dry_run") else "passed" if success else "failed"
             llm_cost_usd = _live_llm_cost_usd(collector.events())
-            summary = {"dry_run": self._settings.engine.dry_run}
+            summary: dict[str, Any] = {"dry_run": self._settings.engine.dry_run}
             if llm_cost_usd is not None:
                 summary["llm_cost_usd"] = llm_cost_usd
             self._repository.add_evaluation(

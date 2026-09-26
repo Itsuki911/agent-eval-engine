@@ -346,7 +346,7 @@ def execute_create_benchmark(args: argparse.Namespace) -> dict[str, Any]:
         "family": data["family"],
         "path": str(target_path.relative_to(PROJECT_ROOT)) if target_path.is_relative_to(PROJECT_ROOT) else str(target_path),
         "source": "user-created",
-        "status": data.get("status", "draft"),
+        "benchmark_status": data.get("status", "draft"),
         "fixture": data["fixture"],
     }
 

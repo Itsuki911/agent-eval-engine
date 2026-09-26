@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import ctypes
 import json
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Iterator
@@ -16,9 +15,11 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 try:
-    from yaml import CSafeLoader as FastYamlLoader
+    from yaml import CSafeLoader
+
+    FastYamlLoader: type[Any] = CSafeLoader
 except ImportError:
-    from yaml import SafeLoader as FastYamlLoader
+    FastYamlLoader = yaml.SafeLoader
 
 
 # タスク本文を表す
@@ -116,7 +117,10 @@ def parse_benchmark_rust(content: str) -> dict[str, Any] | None:
     if not raw_ptr:
         return None
     try:
-        json_str = ctypes.cast(raw_ptr, ctypes.c_char_p).value.decode("utf-8")
+        raw_value = ctypes.cast(raw_ptr, ctypes.c_char_p).value
+        if raw_value is None:
+            raise ValueError("Rust YAML parser returned empty data")
+        json_str = raw_value.decode("utf-8")
         parsed = json.loads(json_str)
         if "error" in parsed:
             raise ValueError(parsed["error"])
@@ -128,8 +132,7 @@ def parse_benchmark_rust(content: str) -> dict[str, Any] | None:
 # Benchmark YAMLを検証して読む
 def load_benchmark(path: str | Path, schema_path: str | Path) -> BenchmarkDefinition:
     resolved_path = Path(path)
-    with resolved_path.open(encoding="utf-8") as benchmark_file:
-        raw_benchmark = fast_yaml_load(benchmark_file)
+    raw_benchmark = fast_yaml_load(resolved_path.read_text(encoding="utf-8"))
 
     validator = get_validator(schema_path)
     validator.validate(raw_benchmark)
@@ -144,8 +147,7 @@ def iter_benchmarks_stream(
     validator = get_validator(schema_path)
     for path in paths:
         resolved = Path(path)
-        with resolved.open(encoding="utf-8") as f:
-            raw = fast_yaml_load(f)
+        raw = fast_yaml_load(resolved.read_text(encoding="utf-8"))
         validator.validate(raw)
         yield BenchmarkDefinition.model_validate(raw)
 

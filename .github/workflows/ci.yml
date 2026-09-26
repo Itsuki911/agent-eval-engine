@@ -31,7 +31,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Python依存関係を導入
-        run: pip install -r requirements-engine.txt
+        run: pip install -r requirements-engine.txt -r requirements-ci.txt
+      - name: Python形式と静的検査を実行
+        run: |
+          ruff check packages/core/agent_eval database scripts
+          mypy
+      - name: Python依存関係を検査
+        run: pip-audit -r requirements-engine.txt
       - name: DBを最新版へ更新
         run: alembic upgrade head
       - name: Pythonテストを実行
@@ -45,3 +51,12 @@ jobs:
       - name: Goテストを実行
         working-directory: apps/cli
         run: go test ./...
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 秘密情報を検査
+        uses: gitleaks/gitleaks-action@v2
