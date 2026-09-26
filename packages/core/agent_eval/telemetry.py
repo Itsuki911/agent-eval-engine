@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProces
 from opentelemetry.trace import Tracer
 
 from agent_eval.config import TelemetrySettings
+from agent_eval.tool_tracer import ToolTracer
 
 
 # 観測に使うトレーサーを表す
@@ -18,6 +19,7 @@ from agent_eval.config import TelemetrySettings
 class Telemetry:
     tracer: Tracer
     provider: TracerProvider
+    tool_tracer: ToolTracer
 
 
 # OpenTelemetryを初期化する
@@ -26,4 +28,5 @@ def create_telemetry(settings: TelemetrySettings) -> Telemetry:
     provider = TracerProvider(resource=resource)
     if settings.exporter == "console":
         provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter(out=sys.stderr)))
-    return Telemetry(tracer=provider.get_tracer("agent_eval"), provider=provider)
+    tracer = provider.get_tracer("agent_eval")
+    return Telemetry(tracer=tracer, provider=provider, tool_tracer=ToolTracer(tracer))

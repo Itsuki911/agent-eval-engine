@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from opentelemetry.trace import Tracer
+from opentelemetry.trace import Span, Tracer
+
+from agent_eval.tool_tracer import ToolTracer
 
 
 # 実行中の1イベントを表す
@@ -27,8 +31,14 @@ class CollectedEvent:
 # イベントを順序付きで収集する
 class EventCollector:
     # 収集先とトレーサーを受け取る
-    def __init__(self, tracer: Tracer, listener: Callable[[CollectedEvent], None] | None = None) -> None:
+    def __init__(
+        self,
+        tracer: Tracer,
+        listener: Callable[[CollectedEvent], None] | None = None,
+        tool_tracer: ToolTracer | None = None,
+    ) -> None:
         self._tracer = tracer
+        self._tool_tracer = tool_tracer or ToolTracer(tracer)
         self._events: list[CollectedEvent] = []
         self._listener = listener
 
@@ -40,6 +50,17 @@ class EventCollector:
         if not span_context.is_valid:
             return None, None
         return f"{span_context.trace_id:032x}", f"{span_context.span_id:016x}"
+
+    # ツール実行をイベントへ連携する
+    @contextmanager
+    def tool(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any] | None = None,
+        category: str | None = None,
+    ) -> Generator[Span, None, None]:
+        with self._tool_tracer.tool(tool_name, arguments, category) as span:
+            yield span
 
     # イベントを記録して返す
     def record(

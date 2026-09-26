@@ -90,7 +90,7 @@ class EvaluationService:
     # benchmarkを評価して保存する
     def run(self, benchmark_path: str | Path) -> EvaluationResult:
         started_at = perf_counter()
-        collector = EventCollector(self._telemetry.tracer, self._event_listener)
+        collector = EventCollector(self._telemetry.tracer, self._event_listener, self._telemetry.tool_tracer)
         graph = self._build_graph()
         with self._telemetry.tracer.start_as_current_span("agent.run"):
             state = graph.invoke(
@@ -112,7 +112,7 @@ class EvaluationService:
     # benchmarkを非同期に評価して保存する
     async def run_async(self, benchmark_path: str | Path) -> EvaluationResult:
         started_at = perf_counter()
-        collector = EventCollector(self._telemetry.tracer, self._event_listener)
+        collector = EventCollector(self._telemetry.tracer, self._event_listener, self._telemetry.tool_tracer)
         state: EvaluationState = {
             "benchmark_path": str(benchmark_path),
             "collector": collector,
