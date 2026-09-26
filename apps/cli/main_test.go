@@ -28,7 +28,7 @@ func TestRenderHomeShowsGuidedActions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render returned error: %v", err)
 	}
-	for _, expected := range []string{"何をしますか？", "評価結果を見る", "新しい評価を開始する", "保存済みデータを探す"} {
+	for _, expected := range []string{"何をしますか？", "評価結果を見る", "新しい評価を開始する", "保存済みデータを探す", "自作benchmarkを確認する"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("missing guided action: %s", expected)
 		}
@@ -172,6 +172,19 @@ func TestReadKeyParsesArrowSequence(t *testing.T) {
 	}
 }
 
+// CRLFのEnterを1回の操作として読む
+func TestReadKeyConsumesCRLFEnter(t *testing.T) {
+	reader := bufio.NewReader(strings.NewReader("\r\n\x1b[B"))
+	enter, err := readKey(reader)
+	if err != nil || enter != "enter" {
+		t.Fatalf("expected enter key, got %q, %v", enter, err)
+	}
+	down, err := readKey(reader)
+	if err != nil || down != "down" {
+		t.Fatalf("expected down key after enter, got %q, %v", down, err)
+	}
+}
+
 // 一覧でEnterを押し詳細へ進む
 func TestRunsEnterOpensDetailScreen(t *testing.T) {
 	state := appState{screen: runsScreen, runIndex: 0}
@@ -192,13 +205,45 @@ func TestHomeNumberKeysNavigateDirectly(t *testing.T) {
 		{"2", traceScreen, 1},
 		{"3", newEvalScreen, 2},
 		{"4", searchScreen, 3},
-		{"5", helpScreen, 4},
+		{"5", userBenchmarkScreen, 4},
+		{"6", helpScreen, 5},
 	}
 	for _, tc := range testCases {
 		state := appState{screen: homeScreen}
 		next, done := nextState(state, tc.key)
 		if done || next.screen != tc.expectedScreen || next.homeIndex != tc.expectedIndex {
 			t.Errorf("key %s failed: got screen %s index %d", tc.key, next.screen, next.homeIndex)
+		}
+	}
+}
+
+// 自作benchmark一覧からYAMLを開く
+func TestUserBenchmarkListOpensYAML(t *testing.T) {
+	state := appState{
+		screen:         userBenchmarkScreen,
+		userBenchmarks: []backendBenchmark{{ID: "GEN-DATA-001", Title: "データ確認"}},
+	}
+	state, done := nextState(state, "enter")
+	if done || state.screen != userBenchmarkYAMLScreen || state.userBenchmarkOffset != 0 {
+		t.Fatalf("expected YAML screen, got: %#v", state)
+	}
+}
+
+// 自作benchmarkのYAMLを表示する
+func TestRenderUserBenchmarkYAMLShowsRawContent(t *testing.T) {
+	state := appState{
+		screen:            userBenchmarkYAMLScreen,
+		userBenchmarks:    []backendBenchmark{{ID: "GEN-DATA-001"}},
+		userBenchmarkYAML: "id: GEN-DATA-001\ntitle: YAML確認\nfamily: generic\n",
+		userBenchmarkPath: "/data/datasets/user/generic/GEN-DATA-001.yaml",
+	}
+	var output bytes.Buffer
+	if err := render(state, &output); err != nil {
+		t.Fatalf("render returned error: %v", err)
+	}
+	for _, expected := range []string{"BENCHMARK YAML", "id: GEN-DATA-001", "title: YAML確認", "/data/datasets/user/generic/GEN-DATA-001.yaml"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("missing YAML value: %s", expected)
 		}
 	}
 }
@@ -423,10 +468,32 @@ func TestCreateBenchmarkAcceptsMultilinePrompt(t *testing.T) {
 	state := appState{screen: createBenchmarkScreen, createField: 5, createInputMode: true}
 	state, _ = nextState(state, "一行目")
 	state, _ = nextState(state, "enter")
+	if state.createPrompt != "一行目\n" || state.createInputMode {
+		t.Fatalf("prompt enter was not confirmed: %#v", state)
+	}
+	state.createInputMode = true
 	state, _ = nextState(state, "二行目")
 	state, _ = nextState(state, "ctrl+s")
 	if state.createPrompt != "一行目\n二行目" || state.createInputMode {
 		t.Fatalf("multiline prompt was not saved: %#v", state)
+	}
+}
+
+// プロンプト確定後に矢印で移動する
+func TestCreatePromptEnterEnablesArrowNavigation(t *testing.T) {
+	state := appState{
+		screen:          createBenchmarkScreen,
+		createField:     5,
+		createInputMode: true,
+		createPrompt:    "Pythonを使用して、helloを表示できる",
+	}
+	state, _ = nextState(state, "enter")
+	if state.createInputMode || state.createPrompt != "Pythonを使用して、helloを表示できる\n" {
+		t.Fatalf("prompt was not confirmed: %#v", state)
+	}
+	state, _ = nextState(state, "down")
+	if state.createField != 6 {
+		t.Fatalf("arrow key did not move to next field: %#v", state)
 	}
 }
 
@@ -545,7 +612,7 @@ func TestRenderCreateBenchmarkInputModeUI(t *testing.T) {
 		createPrompt: "テストプロンプト",
 	}
 	activeOutput := renderCreateBenchmark(activeState)
-	for _, expected := range []string{"[ ✎", "[Esc] 確定・脱出", "[Tab] 次の項目", "[Shift+Tab] 前の項目", "[Ctrl+C] 終了"} {
+	for _, expected := range []string{"[ ✎", "[Enter] 改行して確定", "[Ctrl+N] 改行を続ける", "[Esc] 確定・脱出", "[Tab] 次の項目", "[Ctrl+C] 終了"} {
 		if !strings.Contains(activeOutput, expected) {
 			t.Fatalf("missing active input UI element: %s", expected)
 		}

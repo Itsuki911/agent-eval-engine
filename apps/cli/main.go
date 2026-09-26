@@ -20,17 +20,19 @@ import (
 type screenName string
 
 const (
-	homeScreen            screenName = "home"
-	runsScreen            screenName = "runs"
-	detailScreen          screenName = "detail"
-	traceScreen           screenName = "trace"
-	compareScreen         screenName = "compare"
-	confirmScreen         screenName = "confirm"
-	errorScreen           screenName = "error"
-	newEvalScreen         screenName = "new-evaluation"
-	createBenchmarkScreen screenName = "create-benchmark"
-	searchScreen          screenName = "search"
-	helpScreen            screenName = "help"
+	homeScreen              screenName = "home"
+	runsScreen              screenName = "runs"
+	detailScreen            screenName = "detail"
+	traceScreen             screenName = "trace"
+	compareScreen           screenName = "compare"
+	confirmScreen           screenName = "confirm"
+	errorScreen             screenName = "error"
+	newEvalScreen           screenName = "new-evaluation"
+	createBenchmarkScreen   screenName = "create-benchmark"
+	userBenchmarkScreen     screenName = "user-benchmark-list"
+	userBenchmarkYAMLScreen screenName = "user-benchmark-yaml"
+	searchScreen            screenName = "search"
+	helpScreen              screenName = "help"
 
 	backgroundStyle = "\033[38;2;192;202;245;48;2;26;27;38m"
 	cyanStyle       = "\033[38;2;125;207;255;48;2;26;27;38m"
@@ -45,63 +47,75 @@ const (
 
 	divider = "────────────────────────────────────────────────────────────────────────"
 
+	benchmarkCacheLimit        = 10000
+	cancellationNoticeDuration = 500 * time.Millisecond
+
 	alternateScreenStart = "\033[?1049h\033[?1000h\033[?1006h\033[2J\033[H"
 	alternateScreenEnd   = "\033[?1006l\033[?1000l\033[?1049l"
 )
 
 // UI状態を保持する
 type appState struct {
-	screen           screenName
-	errorKind        string
-	noClear          bool
-	homeIndex        int
-	runIndex         int
-	traceIndex       int
-	newEvalIndex     int
-	searchIndex      int
-	detailIndex      int
-	confirmIndex     int
-	errorIndex       int
-	width            int
-	height           int
-	backend          bool
-	runs             []backendRun
-	runTotal         int
-	runOffset        int
-	detail           *backendDetail
-	benchmarks       []backendBenchmark
-	benchmarkTotal   int
-	benchmarkOffset  int
-	benchmarkFamily  string
-	benchmarkSource  string
-	benchmarkQuery   string
-	filterInput      bool
-	comparison       *backendComparison
-	comparisonOffset int
-	progress         []backendProgress
-	traceOffset      int
-	running          bool
-	cancelling       bool
-	backendError     string
-	exportMessage    string
-	createFamily     string
-	createID         string
-	createTitle      string
-	createCategory   string
-	createFixture    string
-	createPrompt     string
-	createSuccess    string
-	createFailure    string
-	createNetwork    string
-	createTags       string
-	createMetrics    string
-	createMaxSteps   string
-	createTimeout    string
-	createMaxCost    string
-	createStatus     string
-	createField      int
-	createError      string
-	createInputMode  bool
+	screen               screenName
+	errorKind            string
+	noClear              bool
+	homeIndex            int
+	runIndex             int
+	traceIndex           int
+	newEvalIndex         int
+	searchIndex          int
+	detailIndex          int
+	confirmIndex         int
+	errorIndex           int
+	width                int
+	height               int
+	backend              bool
+	runs                 []backendRun
+	runTotal             int
+	runOffset            int
+	detail               *backendDetail
+	benchmarks           []backendBenchmark
+	benchmarkCache       []backendBenchmark
+	benchmarkCacheLoaded bool
+	benchmarkTotal       int
+	benchmarkOffset      int
+	benchmarkFamily      string
+	benchmarkSource      string
+	benchmarkQuery       string
+	filterInput          bool
+	comparison           *backendComparison
+	comparisonOffset     int
+	progress             []backendProgress
+	traceOffset          int
+	running              bool
+	cancelling           bool
+	cancellationFinished bool
+	cancelNoticeUntil    time.Time
+	backendError         string
+	exportMessage        string
+	createFamily         string
+	createID             string
+	createTitle          string
+	createCategory       string
+	createFixture        string
+	createPrompt         string
+	createSuccess        string
+	createFailure        string
+	createNetwork        string
+	createTags           string
+	createMetrics        string
+	createMaxSteps       string
+	createTimeout        string
+	createMaxCost        string
+	createStatus         string
+	createField          int
+	createError          string
+	createInputMode      bool
+	userBenchmarks       []backendBenchmark
+	userBenchmarkIndex   int
+	userBenchmarkYAML    string
+	userBenchmarkPath    string
+	userBenchmarkOffset  int
 }
 
 // 指定色の文字列を返す
@@ -235,6 +249,10 @@ func render(state appState, output io.Writer) error {
 		}
 	case createBenchmarkScreen:
 		content = renderCreateBenchmark(state)
+	case userBenchmarkScreen:
+		content = renderUserBenchmarks(state)
+	case userBenchmarkYAMLScreen:
+		content = renderUserBenchmarkYAML(state)
 	case searchScreen:
 		content = renderSearch(state.searchIndex)
 	case helpScreen:
@@ -336,6 +354,7 @@ func renderHome(selectedIndex int) string {
 		{"Agentの動きを見る", "AIが行った処理を時系列で確認"},
 		{"新しい評価を開始する", "benchmarkを選び、dry-runから安全に開始"},
 		{"保存済みデータを探す", "benchmark・状態・run IDから実行履歴を検索"},
+		{"自作benchmarkを確認する", "自分で保存したYAMLを閲覧（評価は実行しません）"},
 		{"ヘルプ", "操作方法と用語を確認"},
 	}
 	if selectedIndex < 0 {
@@ -357,9 +376,67 @@ func renderHome(selectedIndex int) string {
 	}
 	lines = append(lines,
 		paint(cyanStyle, divider),
-		paint(blueStyle, "↑↓ 選択     [1-5] 番号選択     c 作成     Enter 開く     ? ヘルプ     q 終了"),
+		paint(blueStyle, "↑↓ 選択     [1-6] 番号選択     c 作成     Enter 開く     ? ヘルプ     q 終了"),
 	)
 	return strings.Join(lines, "\n") + "\n"
+}
+
+// 自作benchmark一覧を表示する
+func renderUserBenchmarks(state appState) string {
+	if len(state.userBenchmarks) == 0 {
+		return strings.Join([]string{
+			paint(cyanStyle, "MY BENCHMARKS  |  YAML VIEWER"),
+			paint(slateStyle, "自分で作成・保存したbenchmarkだけを確認します。評価は実行しません。"),
+			paint(cyanStyle, divider),
+			paint(amberStyle, "自作benchmarkはまだありません。ホーム画面の c から作成できます。"),
+			paint(cyanStyle, divider),
+			paint(blueStyle, "r 更新     b 戻る     q 終了"),
+		}, "\n") + "\n"
+	}
+	rows := make([]string, 0, len(state.userBenchmarks)*2)
+	for index, benchmark := range state.userBenchmarks {
+		rows = append(rows, menuOption(index, state.userBenchmarkIndex, benchmark.ID, benchmark.Title))
+		rows = append(rows, paint(slateStyle, "  "+benchmark.Family+"  |  "+benchmark.Status+"  |  "+benchmark.Path), "")
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "MY BENCHMARKS  |  YAML VIEWER"),
+		paint(slateStyle, "自分で作成・保存したbenchmarkだけを確認します。評価は実行しません。"),
+		paint(purpleStyle, fmt.Sprintf("保存済み %d 件", len(state.userBenchmarks))),
+		paint(cyanStyle, divider),
+	}, append(rows,
+		paint(cyanStyle, divider),
+		paint(blueStyle, "↑↓ 選択     Enter YAMLを開く     r 更新     b 戻る     q 終了"),
+	)...), "\n") + "\n"
+}
+
+// 自作benchmarkのYAMLを表示する
+func renderUserBenchmarkYAML(state appState) string {
+	lines := strings.Split(strings.TrimSuffix(state.userBenchmarkYAML, "\n"), "\n")
+	if state.userBenchmarkYAML == "" {
+		lines = []string{"YAMLを読み込めませんでした。"}
+	}
+	end := pageEnd(state.userBenchmarkOffset, pageSize(state), len(lines))
+	rows := make([]string, 0, end-state.userBenchmarkOffset)
+	for _, line := range lines[state.userBenchmarkOffset:end] {
+		rows = append(rows, paint(slateStyle, line))
+	}
+	return strings.Join(append([]string{
+		paint(cyanStyle, "BENCHMARK YAML  |  "+selectedUserBenchmarkID(state)),
+		paint(slateStyle, state.userBenchmarkPath),
+		paint(purpleStyle, "行 "+pageLabel(state.userBenchmarkOffset, len(rows), len(lines))),
+		paint(cyanStyle, divider),
+	}, append(rows,
+		paint(cyanStyle, divider),
+		paint(blueStyle, "↑↓ スクロール     b 一覧へ戻る     q 終了"),
+	)...), "\n") + "\n"
+}
+
+// 選択中の自作benchmark IDを返す
+func selectedUserBenchmarkID(state appState) string {
+	if state.userBenchmarkIndex >= 0 && state.userBenchmarkIndex < len(state.userBenchmarks) {
+		return state.userBenchmarks[state.userBenchmarkIndex].ID
+	}
+	return "UNKNOWN"
 }
 
 // 評価開始画面を作成する
@@ -641,9 +718,9 @@ func renderBackendTrace(state appState) string {
 	running := ""
 	if state.running {
 		if state.cancelling {
-			running = paint(amberStyle, "評価を中止しています。完了を待っています。")
+			running = paint(amberStyle, "評価を中止しています。候補一覧へ戻ります。")
 		} else {
-			running = paint(amberStyle, "評価を実行中です。q で中止できます。")
+			running = paint(amberStyle, "評価を実行中です。b で中止して候補一覧へ戻れます。")
 		}
 	}
 	return strings.Join(append([]string{
@@ -913,9 +990,9 @@ func renderCreateBenchmark(state appState) string {
 	}
 	headerLines = append(headerLines, paint(cyanStyle, divider))
 
-	guide := "↑↓ 項目選択     Enter 編集/保存     Space 選択値を切替     Ctrl+S 複数行保存     b 戻る     q 終了"
+	guide := "↑↓ 項目選択     Enter 編集/保存     Space 選択値を切替     Ctrl+N 改行     b 戻る     q 終了"
 	if state.createInputMode {
-		guide = "[Esc] 確定・脱出   [Tab] 次の項目   [Shift+Tab] 前の項目   [Enter] 改行/確定   [Ctrl+C] 終了"
+		guide = "[Enter] 改行して確定   [Ctrl+N] 改行を続ける   [Esc] 確定・脱出   [Tab] 次の項目   [Ctrl+C] 終了"
 	}
 
 	return strings.Join(append(headerLines, append(rows,
@@ -1013,22 +1090,9 @@ func refreshBackendState(state *appState, client backendClient) {
 		}
 	}
 	if state.screen == newEvalScreen {
-		benchmarks, total, err := client.listBenchmarks(
-			contextValue,
-			state.benchmarkFamily,
-			state.benchmarkQuery,
-			state.benchmarkSource,
-			pageSize(*state),
-			state.benchmarkOffset,
-		)
-		if err != nil {
-			setBackendError(state, "bridge", err)
+		refreshBenchmarkView(state, client)
+		if state.screen == errorScreen {
 			return
-		}
-		state.benchmarks = benchmarks
-		state.benchmarkTotal = total
-		if state.newEvalIndex >= len(state.benchmarks) {
-			state.newEvalIndex = max(0, len(state.benchmarks)-1)
 		}
 	}
 	if (state.screen == detailScreen || state.screen == traceScreen) && len(state.runs) > 0 {
@@ -1063,6 +1127,88 @@ func refreshBackendState(state *appState, client backendClient) {
 	}
 }
 
+// benchmark候補を初回だけ取得する
+func loadBenchmarkCache(state *appState, client backendClient) error {
+	benchmarks, total, err := client.listBenchmarks(
+		context.Background(), "all", "", "all", benchmarkCacheLimit, 0,
+	)
+	if err != nil {
+		return err
+	}
+	if total > len(benchmarks) {
+		return fmt.Errorf("benchmark candidates exceed cache limit: %d", total)
+	}
+	state.benchmarkCache = benchmarks
+	state.benchmarkCacheLoaded = true
+	return nil
+}
+
+// 条件に合う候補ページを作る
+func applyBenchmarkFilter(state *appState) {
+	matched := make([]backendBenchmark, 0, len(state.benchmarkCache))
+	query := strings.ToLower(state.benchmarkQuery)
+	for _, benchmark := range state.benchmarkCache {
+		if state.benchmarkFamily != "" && state.benchmarkFamily != "all" && benchmark.Family != state.benchmarkFamily {
+			continue
+		}
+		if state.benchmarkSource != "" && state.benchmarkSource != "all" && benchmark.Source != state.benchmarkSource {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(benchmark.ID), query) && !strings.Contains(strings.ToLower(benchmark.Title), query) {
+			continue
+		}
+		matched = append(matched, benchmark)
+	}
+	state.benchmarkTotal = len(matched)
+	if state.benchmarkOffset >= state.benchmarkTotal {
+		state.benchmarkOffset = max(0, state.benchmarkTotal-pageSize(*state))
+	}
+	end := pageEnd(state.benchmarkOffset, pageSize(*state), state.benchmarkTotal)
+	state.benchmarks = matched[state.benchmarkOffset:end]
+	if state.newEvalIndex >= len(state.benchmarks) {
+		state.newEvalIndex = max(0, len(state.benchmarks)-1)
+	}
+}
+
+// 候補一覧をキャッシュから更新する
+func refreshBenchmarkView(state *appState, client backendClient) {
+	if !state.benchmarkCacheLoaded {
+		if err := loadBenchmarkCache(state, client); err != nil {
+			setBackendError(state, "bridge", err)
+			return
+		}
+	}
+	applyBenchmarkFilter(state)
+}
+
+// 自作benchmark一覧を更新する
+func refreshUserBenchmarks(state *appState, client backendClient) {
+	benchmarks, _, err := client.listBenchmarks(context.Background(), "all", "", "user-created", benchmarkCacheLimit, 0)
+	if err != nil {
+		setBackendError(state, "bridge", err)
+		return
+	}
+	state.userBenchmarks = benchmarks
+	if state.userBenchmarkIndex >= len(state.userBenchmarks) {
+		state.userBenchmarkIndex = max(0, len(state.userBenchmarks)-1)
+	}
+}
+
+// 選択したYAML原文を更新する
+func refreshUserBenchmarkYAML(state *appState, client backendClient) {
+	if state.userBenchmarkIndex < 0 || state.userBenchmarkIndex >= len(state.userBenchmarks) {
+		return
+	}
+	value, err := client.showUserBenchmark(context.Background(), state.userBenchmarks[state.userBenchmarkIndex].ID)
+	if err != nil {
+		setBackendError(state, "bridge", err)
+		return
+	}
+	state.userBenchmarkYAML = value.YAML
+	state.userBenchmarkPath = value.Path
+	state.userBenchmarkOffset = 0
+}
+
 // backend失敗画面へ遷移する
 func setBackendError(state *appState, kind string, err error) {
 	state.screen = errorScreen
@@ -1095,6 +1241,8 @@ func startBackendRunAsync(ctx context.Context, state *appState, client backendCl
 	state.traceOffset = 0
 	state.running = true
 	state.cancelling = false
+	state.cancellationFinished = false
+	state.cancelNoticeUntil = time.Time{}
 	go func() {
 		defer close(updates)
 		result, err := client.run(ctx, benchmark.Path, func(progress backendProgress) {
@@ -1415,9 +1563,8 @@ func nextState(state appState, key string) (appState, bool) {
 		case "enter":
 			if state.createField == 5 {
 				setCreateFieldValue(&state, state.createField, value+"\n")
-			} else {
-				state.createInputMode = false
 			}
+			state.createInputMode = false
 		default:
 			if strings.HasPrefix(key, "mouse:click:") {
 				state = handleCreateBenchmarkMouse(state, key)
@@ -1473,6 +1620,10 @@ func nextState(state appState, key string) (appState, bool) {
 		return state, false
 	}
 	if key == "r" && state.backend && state.screen != errorScreen {
+		if state.screen == newEvalScreen {
+			state.benchmarkCacheLoaded = false
+			state.benchmarkCache = nil
+		}
 		return state, false
 	}
 	switch key {
@@ -1490,7 +1641,14 @@ func nextState(state appState, key string) (appState, bool) {
 			case 3:
 				state.screen = searchScreen
 			case 4:
+				state.screen = userBenchmarkScreen
+			case 5:
 				state.screen = helpScreen
+			}
+		case userBenchmarkScreen:
+			if len(state.userBenchmarks) > 0 {
+				state.screen = userBenchmarkYAMLScreen
+				state.userBenchmarkOffset = 0
 			}
 		case runsScreen:
 			state.screen = detailScreen
@@ -1554,6 +1712,11 @@ func nextState(state appState, key string) (appState, bool) {
 	case "5":
 		if state.screen == homeScreen {
 			state.homeIndex = 4
+			state.screen = userBenchmarkScreen
+		}
+	case "6":
+		if state.screen == homeScreen {
+			state.homeIndex = 5
 			state.screen = helpScreen
 		}
 	case "d":
@@ -1681,6 +1844,8 @@ func nextState(state appState, key string) (appState, bool) {
 		}
 	case "b":
 		switch state.screen {
+		case userBenchmarkYAMLScreen:
+			state.screen = userBenchmarkScreen
 		case detailScreen, traceScreen, compareScreen, confirmScreen, errorScreen:
 			state.screen = runsScreen
 		default:
@@ -1700,6 +1865,12 @@ func nextState(state appState, key string) (appState, bool) {
 	case "up":
 		if state.screen == homeScreen && state.homeIndex > 0 {
 			state.homeIndex--
+		}
+		if state.screen == userBenchmarkScreen && state.userBenchmarkIndex > 0 {
+			state.userBenchmarkIndex--
+		}
+		if state.screen == userBenchmarkYAMLScreen && state.userBenchmarkOffset > 0 {
+			state.userBenchmarkOffset = max(0, state.userBenchmarkOffset-pageSize(state))
 		}
 		if state.screen == createBenchmarkScreen && state.createField > 0 {
 			state.createField--
@@ -1742,8 +1913,14 @@ func nextState(state appState, key string) (appState, bool) {
 			state.comparisonOffset = max(0, state.comparisonOffset-pageSize(state))
 		}
 	case "down":
-		if state.screen == homeScreen && state.homeIndex < 4 {
+		if state.screen == homeScreen && state.homeIndex < 5 {
 			state.homeIndex++
+		}
+		if state.screen == userBenchmarkScreen && state.userBenchmarkIndex < len(state.userBenchmarks)-1 {
+			state.userBenchmarkIndex++
+		}
+		if state.screen == userBenchmarkYAMLScreen && state.userBenchmarkOffset+pageSize(state) < len(strings.Split(strings.TrimSuffix(state.userBenchmarkYAML, "\n"), "\n")) {
+			state.userBenchmarkOffset += pageSize(state)
 		}
 		if state.screen == createBenchmarkScreen && state.createField < createSaveField {
 			state.createField++
@@ -1881,7 +2058,16 @@ func readKey(reader *bufio.Reader) (string, error) {
 		return "", err
 	}
 	if first != 27 {
-		if first == '\r' || first == '\n' {
+		if first == '\r' {
+			if reader.Buffered() > 0 {
+				next, _ := reader.Peek(1)
+				if len(next) == 1 && next[0] == '\n' {
+					_, _ = reader.ReadByte()
+				}
+			}
+			return "enter", nil
+		}
+		if first == '\n' {
 			return "enter", nil
 		}
 		if first == '\t' || first == 9 {
@@ -2016,11 +2202,34 @@ func needsBackendRefresh(before appState, after appState, key string) bool {
 	return key == "r" || before.screen != after.screen ||
 		before.runOffset != after.runOffset ||
 		before.traceOffset != after.traceOffset ||
+		before.comparisonOffset != after.comparisonOffset
+}
+
+// 候補表示の再計算要否を返す
+func needsBenchmarkViewRefresh(before appState, after appState) bool {
+	return after.screen == newEvalScreen && (before.screen != after.screen ||
 		before.benchmarkOffset != after.benchmarkOffset ||
 		before.benchmarkFamily != after.benchmarkFamily ||
 		before.benchmarkSource != after.benchmarkSource ||
-		before.benchmarkQuery != after.benchmarkQuery ||
-		before.comparisonOffset != after.comparisonOffset
+		before.benchmarkQuery != after.benchmarkQuery)
+}
+
+// 中止案内の表示完了を判定する
+func cancellationReadyToExit(state appState, now time.Time) bool {
+	return state.cancelling && state.cancellationFinished && !now.Before(state.cancelNoticeUntil)
+}
+
+// 中止後に候補一覧へ戻す
+func returnToBenchmarkList(state *appState) {
+	state.running = false
+	state.cancelling = false
+	state.cancellationFinished = false
+	state.cancelNoticeUntil = time.Time{}
+	state.progress = nil
+	state.detail = nil
+	state.traceIndex = 0
+	state.traceOffset = 0
+	state.screen = newEvalScreen
 }
 
 // raw modeで対話表示する
@@ -2059,14 +2268,23 @@ func runTerminal(state appState) error {
 			return err
 		}
 		state.noClear = false
+		if cancellationReadyToExit(state, time.Now()) {
+			returnToBenchmarkList(&state)
+			continue
+		}
+		var cancellationTimer <-chan time.Time
+		if state.cancelling && state.cancellationFinished {
+			cancellationTimer = time.After(time.Until(state.cancelNoticeUntil))
+		}
 		select {
 		case input, open := <-keys:
 			if !open || input.err != nil {
 				return input.err
 			}
-			if state.running && input.key == "q" {
-				cancelRun()
+			if state.running && input.key == "b" && !state.cancelling {
 				state.cancelling = true
+				state.cancelNoticeUntil = time.Now().Add(cancellationNoticeDuration)
+				cancelRun()
 				continue
 			}
 			if state.running {
@@ -2116,33 +2334,52 @@ func runTerminal(state appState) error {
 						state.createError = err.Error()
 					} else {
 						state.createError = ""
+						if state.benchmarkCacheLoaded {
+							state.benchmarkCache = append(state.benchmarkCache, created)
+						}
 						state.benchmarks = []backendBenchmark{created}
 						state.newEvalIndex = 0
 						state.confirmIndex = 1
 						state.screen = confirmScreen
 					}
 				}
+			} else if state.backend && state.screen == userBenchmarkScreen &&
+				(before.screen != userBenchmarkScreen || input.key == "r") {
+				refreshUserBenchmarks(&state, *client)
+			} else if state.backend && before.screen == userBenchmarkScreen && state.screen == userBenchmarkYAMLScreen {
+				refreshUserBenchmarkYAML(&state, *client)
+			} else if needsBenchmarkViewRefresh(before, state) ||
+				(state.backend && state.screen == newEvalScreen && input.key == "r") {
+				refreshBenchmarkView(&state, *client)
 			} else if needsBackendRefresh(before, state, input.key) {
 				refreshBackendState(&state, *client)
 			}
+		case <-cancellationTimer:
+			returnToBenchmarkList(&state)
 		case update, open := <-updates:
 			if !open {
 				updates = nil
+				if state.cancelling {
+					state.cancellationFinished = true
+				}
 				continue
 			}
 			if update.progress != nil {
-				state.progress = append(state.progress, *update.progress)
-				state.traceIndex = len(state.progress) - 1
-				if state.traceIndex >= state.traceOffset+pageSize(state) {
-					state.traceOffset = state.traceIndex - pageSize(state) + 1
+				if !state.cancelling {
+					state.progress = append(state.progress, *update.progress)
+					state.traceIndex = len(state.progress) - 1
+					if state.traceIndex >= state.traceOffset+pageSize(state) {
+						state.traceOffset = state.traceIndex - pageSize(state) + 1
+					}
 				}
+				continue
+			}
+			if state.cancelling {
+				state.cancellationFinished = true
 				continue
 			}
 			state.running = false
 			if update.err != nil {
-				if state.cancelling {
-					return nil
-				}
 				setBackendError(&state, "bridge", update.err)
 				continue
 			}

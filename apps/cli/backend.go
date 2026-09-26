@@ -80,6 +80,13 @@ type backendBenchmark struct {
 	Fixture string `json:"fixture"`
 }
 
+// 自作benchmark原文を表す
+type backendUserBenchmarkYAML struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
+	YAML string `json:"yaml"`
+}
+
 // Python進捗イベントを表す
 type backendProgress struct {
 	Type      string `json:"type"`
@@ -237,6 +244,19 @@ func (client backendClient) listBenchmarks(ctx context.Context, family string, q
 		return nil, 0, err
 	}
 	return response.Benchmarks, response.Total, nil
+}
+
+// 自作benchmark原文を取得する
+func (client backendClient) showUserBenchmark(ctx context.Context, benchmarkID string) (backendUserBenchmarkYAML, error) {
+	output, err := client.execute(ctx, []string{"show-user-benchmark", "--benchmark-id", benchmarkID}, nil)
+	if err != nil {
+		return backendUserBenchmarkYAML{}, err
+	}
+	var response backendUserBenchmarkYAML
+	if err := json.Unmarshal(output, &response); err != nil {
+		return backendUserBenchmarkYAML{}, err
+	}
+	return response, nil
 }
 
 // 指定実行を比較する

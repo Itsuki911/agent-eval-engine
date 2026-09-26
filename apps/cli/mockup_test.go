@@ -21,6 +21,8 @@ func TestMockupRendersAllScreens(t *testing.T) {
 		{"confirm", appState{screen: confirmScreen, noClear: true}, "Default: Cancel"},
 		{"error", appState{screen: errorScreen, errorKind: "openrouter", noClear: true}, "HTTP 429"},
 		{"new evaluation", appState{screen: newEvalScreen, noClear: true}, "STEP 1 / 3"},
+		{"user benchmarks", appState{screen: userBenchmarkScreen, noClear: true}, "MY BENCHMARKS"},
+		{"user benchmark YAML", appState{screen: userBenchmarkYAMLScreen, noClear: true}, "BENCHMARK YAML"},
 		{"search", appState{screen: searchScreen, noClear: true}, "SEARCH RUNS"},
 		{"help", appState{screen: helpScreen, noClear: true}, "用語と操作ガイド"},
 	}
@@ -47,7 +49,7 @@ func TestMockupSelectionStaysWithinBounds(t *testing.T) {
 		lastIndex  func(appState) int
 	}{
 		{
-			"home", appState{screen: homeScreen}, appState{screen: homeScreen, homeIndex: 4},
+			"home", appState{screen: homeScreen}, appState{screen: homeScreen, homeIndex: 5},
 			func(state appState) int { return state.homeIndex }, func(state appState) int { return state.homeIndex },
 		},
 		{

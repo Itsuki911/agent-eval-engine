@@ -61,11 +61,11 @@ docker compose --profile engine run --rm engine pytest -v -s tests/unit/test_tui
 実行コマンド:
 
 ```powershell
-docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run "TestBackend(NewEvaluationShowsSinglePage|BenchmarkSelectionMovesToNextPage|TraceShowsCancelGuideWhileRunning|TraceShowsCancellationState)|TestReadKeysReceivesInputAsynchronously|TestNeedsBackendRefreshForPageChange" ./...'
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run "TestBackend(NewEvaluationShowsSinglePage|BenchmarkSelectionMovesToNextPage|TraceShowsCancelGuideWhileRunning|TraceShowsCancellationState)|TestReadKeysReceivesInputAsynchronously|TestBenchmarkPageChangeUsesLocalCache|TestReturnToBenchmarkListAfterCancellation" ./...'
 ```
 
 1. 実行コマンドを実行する。
 2. ページング関連のテスト名と結果を確認する。
 3. 非同期キー入力と中止案内のテスト名と結果を確認する。
 
-期待結果: 正常系・異常系。候補一覧は`候補 1-5 / 281`のように範囲を表示し、末尾の下矢印キーで次ページへ移動する。実行中のTraceには`q で中止できます`、中止要求後には`評価を中止しています`が表示される。ページ内の選択操作だけではPython backendを再取得せず、ページ変更時だけ再取得する。
+期待結果: 正常系・異常系。候補一覧は`候補 1-5 / 281`のように範囲を表示し、末尾の下矢印キーで次ページへ移動する。実行中のTraceには`b で中止して候補一覧へ戻れます`、中止要求後には`評価を中止しています。候補一覧へ戻ります。`が表示される。ページ内の選択操作とページ変更ではPython backendを再取得せず、候補キャッシュを再利用する。中止後はTUIを終了せず候補一覧へ戻る。

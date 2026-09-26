@@ -57,6 +57,8 @@ def parse_args() -> argparse.Namespace:
     benchmark_parser.add_argument("--query", default="")
     benchmark_parser.add_argument("--limit", type=int, default=12)
     benchmark_parser.add_argument("--offset", type=int, default=0)
+    user_benchmark_parser = subparsers.add_parser("show-user-benchmark")
+    user_benchmark_parser.add_argument("--benchmark-id", required=True)
     export_parser = subparsers.add_parser("export-csv")
     export_parser.add_argument("--run-id", default=None)
     export_parser.add_argument("--output", default=None)
@@ -206,7 +208,7 @@ def list_benchmarks(
     limit: int = 12,
     offset: int = 0,
 ) -> dict[str, Any]:
-    page_limit = min(max(limit, 1), 50)
+    page_limit = min(max(limit, 1), 10000)
     page_offset = max(offset, 0)
     index_path = PROJECT_ROOT / "benchmarks" / "index.json"
 
@@ -351,6 +353,20 @@ def execute_create_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+# 自作benchmarkのYAML原文を返す
+def execute_show_user_benchmark(args: argparse.Namespace) -> dict[str, Any]:
+    root = user_dataset_root().resolve()
+    for family in ("generic", "coding"):
+        path = (root / family / f"{args.benchmark_id}.yaml").resolve()
+        if path.is_relative_to(root) and path.is_file():
+            return {
+                "id": args.benchmark_id,
+                "path": str(path),
+                "yaml": path.read_text(encoding="utf-8"),
+            }
+    raise ValueError("自作benchmarkが見つかりません")
+
+
 # sample ZIPをローカルへ導入する
 def execute_install_sample(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(os.environ.get("AGENT_EVAL_DATA_DIR", PROJECT_ROOT / "local-data"))
@@ -380,6 +396,8 @@ def main() -> int:
             output = execute_get_template(args)
         elif args.command == "create-benchmark":
             output = execute_create_benchmark(args)
+        elif args.command == "show-user-benchmark":
+            output = execute_show_user_benchmark(args)
         elif args.command == "install-sample":
             output = execute_install_sample(args)
         elif args.command == "download-sample":

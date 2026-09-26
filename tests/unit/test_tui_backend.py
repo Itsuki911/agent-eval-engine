@@ -88,6 +88,15 @@ def test_list_benchmarks_returns_requested_page() -> None:
     print(json.dumps({"test": "benchmark_page", "first_count": 3, "second_offset": 3}))
 
 
+# TUIキャッシュ用に全候補を取得する
+def test_list_benchmarks_accepts_cache_limit() -> None:
+    output = tui_backend.list_benchmarks(limit=10_000)
+
+    assert output["limit"] == 10_000
+    assert len(output["benchmarks"]) == output["total"]
+    print(json.dumps({"test": "benchmark_cache", "count": output["total"]}))
+
+
 # ID検索で候補を絞り込む
 def test_list_benchmarks_filters_by_id() -> None:
     output = tui_backend.list_benchmarks(query="GEN-TOOL", limit=50)
@@ -114,6 +123,31 @@ def test_execute_create_benchmark_saves_complete_form(tmp_path: Path, monkeypatc
     assert saved["limits"]["max_steps"] == 7
     assert saved["limits"]["max_estimated_cost_usd"] == 0.0
     print(json.dumps({"test": "tui_create", "id": output["id"], "max_steps": 7}))
+
+
+# 自作benchmarkのYAML原文を取得する
+def test_execute_show_user_benchmark_returns_saved_yaml(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_EVAL_DATA_DIR", str(tmp_path))
+    data = get_benchmark_template("generic")
+    data["id"] = "GEN-VIEW-001"
+    data["title"] = "YAML確認"
+    tui_backend.execute_create_benchmark(SimpleNamespace(data=json.dumps(data)))
+
+    output = tui_backend.execute_show_user_benchmark(SimpleNamespace(benchmark_id="GEN-VIEW-001"))
+
+    assert output["id"] == "GEN-VIEW-001"
+    assert "title: YAML確認" in output["yaml"]
+    assert output["path"].endswith("datasets/user/generic/GEN-VIEW-001.yaml")
+    print(json.dumps({"test": "user_benchmark_yaml", "id": output["id"]}))
+
+
+# 存在しない自作benchmarkを拒否する
+def test_execute_show_user_benchmark_rejects_unknown_id(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_EVAL_DATA_DIR", str(tmp_path))
+
+    with pytest.raises(ValueError, match="自作benchmarkが見つかりません"):
+        tui_backend.execute_show_user_benchmark(SimpleNamespace(benchmark_id="GEN-UNKNOWN-001"))
+    print(json.dumps({"test": "user_benchmark_yaml", "rejected": True}))
 
 
 # 存在しないfixtureを保存前に拒否する

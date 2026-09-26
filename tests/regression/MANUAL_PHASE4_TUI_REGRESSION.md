@@ -90,3 +90,45 @@ docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v
 2. テスト結果がPASSすることを確認する。
 
 期待結果: 異常系・境界値。`TestCreateBenchmarkCtrlCTerminates`が`PASS`し、複数行テキスト入力モードで文字入力中などの緊急時であっても、Ctrl+Cキーを受信してプロセスが確実に即時終了できること。
+
+## RT-TUI-008 benchmark候補を切り替えてもPython backendを再実行しない（回帰）
+
+実行コマンド:
+
+```powershell
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run "TestBenchmarkPageChangeUsesLocalCache|TestApplyBenchmarkFilterUsesCachedCandidates" ./...'
+```
+
+1. 実行コマンドを実行する。
+2. `TestBenchmarkPageChangeUsesLocalCache`がPASSすることを確認する。
+3. `TestApplyBenchmarkFilterUsesCachedCandidates`がPASSすることを確認する。
+
+期待結果: 正常系（回帰検証）。ページ移動、family、source、検索語の変更ではPython backendを再実行せず、初回取得済みの候補キャッシュから一致する候補だけが即時に表示されること。
+
+## RT-TUI-009 実行中の中止で案内を表示して候補一覧へ戻れる（回帰）
+
+実行コマンド:
+
+```powershell
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run "TestCancellationWaitsForNoticeDuration|TestReturnToBenchmarkListAfterCancellation" ./...'
+```
+
+1. 実行コマンドを実行する。
+2. `TestCancellationWaitsForNoticeDuration`がPASSすることを確認する。
+3. `TestReturnToBenchmarkListAfterCancellation`がPASSすることを確認する。
+
+期待結果: 異常系（回帰検証）。評価の中止結果を先に受信しても、`評価を中止しています。候補一覧へ戻ります。`を表示するための500msが経過する前に画面遷移しないこと。中止後はTUIを終了せず、候補一覧へ戻り、候補を再選択できること。
+
+## RT-TUI-010 指示プロンプトをEnterで確定した後に矢印キーで移動できる（回帰）
+
+実行コマンド:
+
+```powershell
+docker compose --profile cli run --rm --build --entrypoint sh cli -c 'go test -v -run "TestCreatePromptEnterEnablesArrowNavigation|TestReadKeyConsumesCRLFEnter" ./...'
+```
+
+1. 実行コマンドを実行する。
+2. `TestCreatePromptEnterEnablesArrowNavigation`がPASSすることを確認する。
+3. `TestReadKeyConsumesCRLFEnter`がPASSすることを確認する。
+
+期待結果: 正常系（回帰検証）。指示プロンプトでEnterを押すと、改行記号`↵`が保存されて編集モードが解除される。WindowsのCRLF入力でもEnterが二重操作にならず、直後の下矢印キーで`成功条件`へ移動できること。

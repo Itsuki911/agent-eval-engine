@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 // JSON Lines進捗を読み取る
@@ -190,7 +191,7 @@ func TestBackendTraceShowsCancelGuideWhileRunning(t *testing.T) {
 	if err := render(state, &output); err != nil {
 		t.Fatalf("render returned error: %v", err)
 	}
-	if !strings.Contains(output.String(), "q で中止できます") {
+	if !strings.Contains(output.String(), "b で中止して候補一覧へ戻れます") {
 		t.Fatal("cancel guide was not rendered")
 	}
 }
@@ -223,16 +224,71 @@ func TestReadKeysReceivesInputAsynchronously(t *testing.T) {
 	}
 }
 
-// ページ移動時だけbackendを更新する
-func TestNeedsBackendRefreshForPageChange(t *testing.T) {
+// 一覧ページ移動はbackendを再実行しない
+func TestBenchmarkPageChangeUsesLocalCache(t *testing.T) {
 	before := appState{screen: newEvalScreen, backend: true, benchmarkOffset: 0}
 	after := before
 	after.benchmarkOffset = 5
-	if !needsBackendRefresh(before, after, "down") {
-		t.Fatal("page change must refresh backend data")
+	if needsBackendRefresh(before, after, "down") {
+		t.Fatal("page change must not refresh backend data")
 	}
-	if needsBackendRefresh(before, before, "down") {
-		t.Fatal("selection inside a page must not refresh backend data")
+	if !needsBenchmarkViewRefresh(before, after) {
+		t.Fatal("page change must refresh local benchmark view")
+	}
+}
+
+// 条件変更で候補を即時に絞り込む
+func TestApplyBenchmarkFilterUsesCachedCandidates(t *testing.T) {
+	state := appState{
+		height:          24,
+		benchmarkFamily: "generic",
+		benchmarkQuery:  "GEN-TOOL",
+		benchmarkCache: []backendBenchmark{
+			{ID: "GEN-TOOL-001", Title: "ツール評価", Family: "generic", Source: "sample"},
+			{ID: "GEN-SEC-001", Title: "安全性評価", Family: "generic", Source: "sample"},
+			{ID: "COD-TS-001", Title: "型検査", Family: "coding", Source: "sample"},
+		},
+	}
+	applyBenchmarkFilter(&state)
+	if state.benchmarkTotal != 1 || len(state.benchmarks) != 1 || state.benchmarks[0].ID != "GEN-TOOL-001" {
+		t.Fatalf("unexpected filtered candidates: %+v", state.benchmarks)
+	}
+}
+
+// 中止案内の表示時間を保証する
+func TestCancellationWaitsForNoticeDuration(t *testing.T) {
+	now := time.Now()
+	state := appState{
+		cancelling:           true,
+		cancellationFinished: true,
+		cancelNoticeUntil:    now.Add(cancellationNoticeDuration),
+	}
+	if cancellationReadyToExit(state, now) {
+		t.Fatal("cancellation notice must remain visible")
+	}
+	if !cancellationReadyToExit(state, now.Add(cancellationNoticeDuration)) {
+		t.Fatal("cancellation must exit after notice duration")
+	}
+}
+
+// 中止完了後に候補一覧へ戻す
+func TestReturnToBenchmarkListAfterCancellation(t *testing.T) {
+	state := appState{
+		screen:               traceScreen,
+		running:              true,
+		cancelling:           true,
+		cancellationFinished: true,
+		progress:             []backendProgress{{Sequence: 1}},
+		benchmarkCacheLoaded: true,
+		benchmarks:           []backendBenchmark{{ID: "GEN-TOOL-001"}},
+		benchmarkTotal:       1,
+	}
+	returnToBenchmarkList(&state)
+	if state.screen != newEvalScreen || state.running || state.cancelling || len(state.progress) != 0 {
+		t.Fatalf("unexpected cancellation return state: %+v", state)
+	}
+	if len(state.benchmarks) != 1 || state.benchmarks[0].ID != "GEN-TOOL-001" {
+		t.Fatal("benchmark selection must remain available")
 	}
 }
 
