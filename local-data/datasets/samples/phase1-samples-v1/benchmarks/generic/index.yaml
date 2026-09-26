@@ -1,0 +1,4 @@
+schema_version: "0.1"
+family: generic
+count: 128
+source: scripts/generate_phase1_benchmarks.py

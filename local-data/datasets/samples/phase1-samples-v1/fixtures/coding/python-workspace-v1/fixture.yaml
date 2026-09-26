@@ -1,0 +1,7 @@
+schema_version: "0.1"
+id: python-workspace-v1
+family: coding
+reset: {strategy: copy}
+environment: {language: python, runtime: "3.12", network: disabled, working_directory: workspace}
+verification: {command: "python -m unittest discover ../verify", protected_paths: [verify]}
+notes: "Python用の自己完結型workspace。実タスクごとの故障状態は後続versionで追加する。"

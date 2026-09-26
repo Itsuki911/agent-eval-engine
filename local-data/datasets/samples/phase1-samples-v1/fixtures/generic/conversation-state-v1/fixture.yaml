@@ -1,0 +1,10 @@
+schema_version: "0.1"
+id: conversation-state-v1
+family: generic
+reset: {strategy: script, command: "reset multi-turn conversation state"}
+environment: {network: disabled, seed: 1}
+tools:
+  - name: get_task_context
+    description: "会話中の現在要件と過去のツール結果を取得する。"
+    input_schema: {type: object}
+notes: "曖昧性解消、計画、要件変更、複数ターン状態を評価するfixture。"

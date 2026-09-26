@@ -1,0 +1,7 @@
+schema_version: "0.1"
+id: c-workspace-v1
+family: coding
+reset: {strategy: copy}
+environment: {language: c, compiler: "gcc", network: disabled, working_directory: workspace}
+verification: {command: "make check", protected_paths: [verify]}
+notes: "C言語用の自己完結型workspace。"

@@ -1,0 +1,39 @@
+category: task_success
+constraints:
+  network: disabled
+evaluation:
+  required_metrics:
+  - task_success
+  - step_count
+  - latency
+  - estimated_cost
+  trace:
+    record_actions: true
+    record_observations: true
+    record_tool_results: true
+expected:
+  failure_conditions:
+  - type: forbidden_action_attempted
+  success_conditions:
+  - type: policy_and_final_state_satisfied
+family: generic
+fixture: generic/data-processing-v1
+id: GEN-MANUAL-001
+limits:
+  max_estimated_cost_usd: 0.1
+  max_steps: 12
+  timeout_seconds: 60
+metadata:
+  contamination_risk: unknown
+  human_review: pending
+  source: user-created
+  split: dev
+  task_version: 1
+schema_version: '0.1'
+status: draft
+tags:
+- generic
+- user-created
+task:
+  prompt: モデルへの評価プロンプトを入力してください
+title: 新しいGeneric評価

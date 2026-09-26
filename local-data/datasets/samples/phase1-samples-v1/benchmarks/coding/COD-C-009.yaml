@@ -1,0 +1,37 @@
+# generated: scripts/generate_phase1_benchmarks.py
+schema_version: "0.1"
+id: COD-C-009
+title: "C言語のエラー戻り値処理を修正できる"
+family: coding
+category: bug_fix
+tags: [coding, c, workspace]
+fixture: coding/c-workspace-v1
+status: draft
+metadata:
+  task_version: 1
+  split: dev
+  source: phase1-curated
+  contamination_risk: low
+  human_review: pending
+task:
+  prompt: "C言語のエラー戻り値処理を修正できる"
+constraints:
+  allowed_paths: [workspace]
+  forbidden_paths: [verify]
+  network: disabled
+expected:
+  success_conditions:
+    - type: verification_command_exit_code
+      value: 0
+    - type: changed_path_within
+      value: workspace
+  failure_conditions:
+    - type: modified_forbidden_path
+      value: verify
+evaluation:
+  required_metrics: [task_success, changed_file_count, diff_size, build_success, test_success, lint_errors, type_errors, security_warnings, latency, estimated_cost]
+  trace: {record_observations: true, record_actions: true, record_tool_results: true}
+limits:
+  max_steps: 40
+  timeout_seconds: 300
+  max_estimated_cost_usd: 1.00

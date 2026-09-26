@@ -1,0 +1,10 @@
+schema_version: "0.1"
+id: data-processing-v1
+family: generic
+reset: {strategy: script, command: "reset deterministic data records"}
+environment: {network: disabled, seed: 1, timezone: UTC}
+tools:
+  - name: query_records
+    description: "決定的なレコード集合を照会する。"
+    input_schema: {type: object, required: [query]}
+notes: "識別子、時刻、単位、集計、根拠付き回答、結果分類を評価するfixture。"

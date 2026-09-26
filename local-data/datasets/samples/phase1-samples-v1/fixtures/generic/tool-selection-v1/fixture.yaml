@@ -1,0 +1,17 @@
+schema_version: "0.1"
+id: tool-selection-v1
+family: generic
+reset:
+  strategy: script
+  command: "reset deterministic tool catalog"
+environment:
+  network: disabled
+  seed: 1
+tools:
+  - name: lookup_record
+    description: "許可された公開レコードをIDで取得する。"
+    input_schema: {type: object, required: [id]}
+  - name: summarize_record
+    description: "取得済みレコードだけを要約する。"
+    input_schema: {type: object, required: [record]}
+notes: "BFCL型のツール選択・引数・結果利用を検証する決定的fixture。"
