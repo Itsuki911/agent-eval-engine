@@ -54,6 +54,45 @@ services:
     volumes:
       - ./:/workspace
 
+  # REST API を公開する
+  api:
+    profiles: ["api"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    working_dir: /workspace
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_eval}:${POSTGRES_PASSWORD:-local-development-password}@db:5432/${POSTGRES_DB:-agent_eval}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-replace-with-your-openrouter-api-key}
+      PYTHONPATH: /workspace:/workspace/packages/core
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${AGENT_EVAL_API_PORT:-8000}:8000"
+    volumes:
+      - ./:/workspace
+
+  # MCP Host接続用の実行環境
+  mcp:
+    profiles: ["mcp"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.engine
+    working_dir: /workspace
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_eval}:${POSTGRES_PASSWORD:-local-development-password}@db:5432/${POSTGRES_DB:-agent_eval}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-replace-with-your-openrouter-api-key}
+      AGENT_EVAL_MCP_ALLOW_LIVE: ${AGENT_EVAL_MCP_ALLOW_LIVE:-0}
+      PYTHONPATH: /workspace:/workspace/packages/core
+    depends_on:
+      db:
+        condition: service_healthy
+    stdin_open: true
+    volumes:
+      - ./:/workspace
+    command: ["sh", "-c", "while :; do sleep 3600; done"]
+
   # Go CLI/TUIモック用
   cli:
     profiles: ["cli"]

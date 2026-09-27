@@ -1,0 +1,14 @@
+.env
+.env.*
+local-data/
+exports/
+postgres_data/
+tests/
+reference/
+examples/
+README.md
+AGENTS.md
+PROMPT.md
+.git/
+__pycache__/
+.pytest_cache/

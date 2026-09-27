@@ -1,0 +1,43 @@
+{
+  "manifest_version": "0.3",
+  "name": "agent-eval-engine",
+  "display_name": "Agent Eval Engine (Local)",
+  "version": "0.1.0",
+  "description": "ローカル Docker 上で AI Agent 評価を実行・追跡する MCP Server。",
+  "long_description": "Agent Eval Engine は benchmark の評価、実行履歴、metrics、時系列 trace を利用者のローカル PostgreSQL に保存します。初期状態は dry-run です。Docker Desktop が必要です。",
+  "author": {
+    "name": "Itsuki911"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Itsuki911/agent-eval-engine.git"
+  },
+  "homepage": "https://github.com/Itsuki911/agent-eval-engine",
+  "documentation": "https://github.com/Itsuki911/agent-eval-engine/tree/main/docs",
+  "support": "https://github.com/Itsuki911/agent-eval-engine/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server/launch.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/launch.js"]
+    }
+  },
+  "tools": [
+    {"name": "run_benchmark", "description": "benchmarkを評価して保存する"},
+    {"name": "evaluate_agent", "description": "Agent評価の互換入口"},
+    {"name": "get_run", "description": "保存済みrunの詳細を取得する"},
+    {"name": "get_trace", "description": "runの時系列traceを取得する"},
+    {"name": "get_errors", "description": "runのエラーを取得する"},
+    {"name": "compare_runs", "description": "2 runのmetricsを比較する"},
+    {"name": "run_regression", "description": "最大10件を回帰評価する"}
+  ],
+  "keywords": ["agent", "evaluation", "benchmark", "trace", "local"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  }
+}
