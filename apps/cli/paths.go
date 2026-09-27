@@ -80,6 +80,8 @@ func ensureUserDataDirectories(root string) (userDataPaths, error) {
 		}
 	}
 
+	_ = ensureStandaloneCompose(paths.Root)
+
 	return paths, nil
 }
 
@@ -96,4 +98,30 @@ func resolveUserPath(root, relPath string) (string, error) {
 	}
 
 	return target, nil
+}
+
+// 開発リポジトリのルートパスを保存する
+func saveConfiguredRepoRoot(dataRoot, repoRoot string) error {
+	if repoRoot == "" {
+		return nil
+	}
+	cleanRepo := filepath.Clean(repoRoot)
+	configDir := filepath.Join(dataRoot, "config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(configDir, "repo_root.txt"), []byte(cleanRepo), 0644)
+}
+
+// 保存された開発リポジトリのルートパスを取得する
+func resolveConfiguredRepoRoot(dataRoot string) string {
+	content, err := os.ReadFile(filepath.Join(dataRoot, "config", "repo_root.txt"))
+	if err != nil {
+		return ""
+	}
+	trimmed := strings.TrimSpace(string(content))
+	if trimmed == "" {
+		return ""
+	}
+	return filepath.Clean(trimmed)
 }

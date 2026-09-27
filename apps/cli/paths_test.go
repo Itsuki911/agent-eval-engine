@@ -116,3 +116,28 @@ func TestResolveUserPathTraversal(t *testing.T) {
 		t.Fatal("expected nested traversal attempt to fail, but it succeeded")
 	}
 }
+
+// 開発リポジトリのルートパス永続化と解決をテストする
+func TestConfiguredRepoRootPersistence(t *testing.T) {
+	tempDataRoot, err := os.MkdirTemp("", "agent-eval-reporoot-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDataRoot)
+
+	// 最初は未設定
+	if resolved := resolveConfiguredRepoRoot(tempDataRoot); resolved != "" {
+		t.Fatalf("expected empty repo root, got %s", resolved)
+	}
+
+	// 保存する
+	targetRepo := filepath.Join(tempDataRoot, "my-repo")
+	if err := saveConfiguredRepoRoot(tempDataRoot, targetRepo); err != nil {
+		t.Fatalf("saveConfiguredRepoRoot failed: %v", err)
+	}
+
+	// 取得する
+	if resolved := resolveConfiguredRepoRoot(tempDataRoot); resolved != filepath.Clean(targetRepo) {
+		t.Fatalf("expected %s, got %s", filepath.Clean(targetRepo), resolved)
+	}
+}

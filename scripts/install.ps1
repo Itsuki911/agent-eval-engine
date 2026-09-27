@@ -133,6 +133,23 @@ try {
             }
         }
 
+        # リポジトリパスの自動検出と登録 (リポジトリ内で実行された場合)
+        if ($PSScriptRoot) {
+            $repoCompose = Join-Path $PSScriptRoot "..\docker-compose.yml"
+            if (Test-Path $repoCompose) {
+                $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+                [Environment]::SetEnvironmentVariable("AGENT_EVAL_ROOT", $repoRoot, "User")
+                $env:AGENT_EVAL_ROOT = $repoRoot
+
+                $configDir = "$env:LOCALAPPDATA\AgentEvalEngine\config"
+                if (-not (Test-Path $configDir)) {
+                    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+                }
+                Set-Content -Path (Join-Path $configDir "repo_root.txt") -Value $repoRoot -Force
+                Write-Host "✓ リポジトリパスを登録しました (AGENT_EVAL_ROOT): $repoRoot" -ForegroundColor Green
+            }
+        }
+
         # 動作確認
         Write-Host ""
         Write-Host "インストール確認を実行中..."

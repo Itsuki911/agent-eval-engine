@@ -21,65 +21,76 @@ Agent Eval Engine のインストール手順です。
 
 ## 2. Windows へのインストール
 
-PowerShell 7 または Windows PowerShell 5.1 を開き、以下のワンライナーまたはインストーラースクリプトを実行します。
-
-### インストーラースクリプトを使用する場合
+### A. 最速ワンライナー (推奨・clone 不要)
+PowerShell 7 または Windows PowerShell 5.1 を開き、以下を実行します:
 
 ```powershell
-# GitHub Releases またはリポジトリからスクリプトを実行
+irm https://raw.githubusercontent.com/Itsuki911/agent-eval-engine/main/scripts/install.ps1 | iex
+```
+
+### B. リポジトリをクローンして導入する場合 (開発者向け)
+```powershell
+git clone https://github.com/Itsuki911/agent-eval-engine.git
+cd agent-eval-engine
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
-特定のバージョンを指定する場合:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Version "1.0.0"
-```
-
-インストーラーの動作:
-1. GitHub Releases より最新の `agent-eval-windows-amd64.zip` と `checksums.txt` をダウンロードします。
+### インストーラーの動作:
+1. GitHub Releases より最新の `agent-eval_windows_<arch>.zip` と `checksums.txt` を取得します。
 2. SHA-256 チェックサムを自動検証し、改ざんや破損がないことを確認します。
-3. `%LOCALAPPDATA%\Programs\AgentEvalEngine` に `agent-eval.exe` を配置します。
+3. `%LOCALAPPDATA%\Programs\AgentEval\bin` に `agent-eval.exe` を配置します。
 4. ユーザー環境変数 `PATH` に上記ディレクトリを追加します。
-
-### 手動インストールの場合
-1. GitHub Releases ページから `agent-eval-windows-amd64.zip` をダウンロードします。
-2. `agent-eval.exe` を任意のフォルダ（例: `C:\Tools\agent-eval.exe`）に解凍します。
-3. 解凍先フォルダをシステム環境変数 `PATH` に追加します。
+5. `agent-eval init` 時に、GHCR (`ghcr.io/itsuki911/agent-eval-engine:latest`) を利用するスタンドアロン Compose 環境が自動構築されます。
 
 ---
 
 ## 3. macOS / Linux へのインストール
 
-### 手動インストール手順
+### A. 最速ワンライナー (推奨・clone 不要)
+ターミナル (Bash / Zsh) を開き、以下を実行します:
 
 ```bash
-# 1. GitHub Releases から対応アーカイブをダウンロード
-# 例 (macOS Apple Silicon):
-curl -LO https://github.com/Itsuki911/agent-eval-engine/releases/latest/download/agent-eval-darwin-arm64.tar.gz
-curl -LO https://github.com/Itsuki911/agent-eval-engine/releases/latest/download/checksums.txt
-
-# 2. SHA-256 チェックサムを検証
-shasum -a 256 --check checksums.txt --ignore-missing
-
-# 3. 解凍と配置
-tar -xzf agent-eval-darwin-arm64.tar.gz
-chmod +x agent-eval
-sudo mv agent-eval /usr/local/bin/
-
-# 4. バージョン確認
-agent-eval version
+curl -fsSL https://raw.githubusercontent.com/Itsuki911/agent-eval-engine/main/scripts/install.sh | bash
 ```
+
+### B. リポジトリをクローンして導入する場合 (開発者向け)
+```bash
+git clone https://github.com/Itsuki911/agent-eval-engine.git
+cd agent-eval-engine
+chmod +x ./scripts/install.sh
+./scripts/install.sh
+```
+
+### シェルインストーラーの動作:
+1. OS (`Darwin` / `Linux`) と CPU (`arm64` / `amd64`) を自動判定します。
+2. GitHub Releases から対応アーカイブと `checksums.txt` を取得し、SHA-256 を検証します。
+3. `/usr/local/bin/agent-eval`（権限がない場合は `~/.local/bin/agent-eval`）へバイナリを配置します。
+4. `agent-eval init` 時に、GHCR イメージを利用する Compose 定義が自動配置されます。
+5. （リポジトリ内で実行した場合）リポジトリパスを `~/Library/Application Support/AgentEvalEngine/config/repo_root.txt`（Linux は `~/.local/share/...`）に自動保存します。
 
 ---
 
-## 4. インストール確認と初期診断
+## 4. 手動インストールの場合
 
-端末を再起動（または新しいターミナルを開き）、以下を実行します。
+GitHub Releases ページから直接アーカイブをダウンロードして手動配置することも可能です。
+
+### 手動手順
+1. Releases ページから `agent-eval_<os>_<arch>.tar.gz` (Windows は `.zip`) をダウンロードします。
+2. `shasum -a 256` (または `sha256sum`) で `checksums.txt` と突合します。
+3. 解凍した `agent-eval` を PATH が通ったディレクトリに配置します。
+4. リポジトリのディレクトリで一度 `agent-eval init` を実行すると、リポジトリのパスが自動記憶されます。
+
+---
+
+## 5. インストール確認と初期診断
+
+新しいターミナルを開き、以下を実行します。
 
 ```text
 agent-eval version
+agent-eval init
 agent-eval doctor
 ```
 
-`agent-eval doctor` が実行環境（Docker, ストレージ, 設定）を診断し、準備状況を日本語で案内します。
-問題がなければ、続いて初期化を行います（詳細は [docs/SETUP.md](SETUP.md) を参照）。
+`agent-eval doctor` がすべての環境チェック（Docker, DB, ストレージ, MCP）に `[OK]` を出せば準備完了です。
+引数なしで `agent-eval` を実行して TUI を起動してください。

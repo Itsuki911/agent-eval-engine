@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -90,6 +91,16 @@ func executeCLI(args []string, stdout, stderr io.Writer) error {
 
 		fmt.Fprintln(stderr, "初期セットアップを開始しています...")
 		fmt.Fprintf(stderr, "✓ データ保存先を準備しました: %s\n", paths.Root)
+
+		// 開発リポジトリパスの自動検出と永続化
+		currentDir, _ := filepath.Abs(".")
+		if _, err := os.Stat(filepath.Join(currentDir, "docker-compose.yml")); err == nil {
+			_ = saveConfiguredRepoRoot(paths.Root, currentDir)
+			fmt.Fprintf(stderr, "✓ 開発リポジトリを登録しました: %s\n", currentDir)
+		} else if envRoot := os.Getenv("AGENT_EVAL_ROOT"); envRoot != "" {
+			_ = saveConfiguredRepoRoot(paths.Root, envRoot)
+			fmt.Fprintf(stderr, "✓ 開発リポジトリを登録しました: %s\n", envRoot)
+		}
 
 		// DBマイグレーション実行
 		client := newBackendClient()

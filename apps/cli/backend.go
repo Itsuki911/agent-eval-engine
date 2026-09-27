@@ -128,6 +128,26 @@ type backendComparison struct {
 func newBackendClient() backendClient {
 	root := os.Getenv("AGENT_EVAL_ROOT")
 	if root == "" {
+		// 1. カレントディレクトリに docker-compose.yml があるか確認
+		if _, err := os.Stat("docker-compose.yml"); err == nil {
+			root = "."
+		} else {
+			// 2. 利用者データ保存先に記録されたリポジトリパスがあるか確認
+			dataRoot := resolveUserDataRoot()
+			if saved := resolveConfiguredRepoRoot(dataRoot); saved != "" {
+				if _, err := os.Stat(filepath.Join(saved, "docker-compose.yml")); err == nil {
+					root = saved
+				}
+			}
+			// 3. 利用者データ保存先自身の standalone docker-compose.yml を確認
+			if root == "" {
+				if _, err := os.Stat(filepath.Join(dataRoot, "docker-compose.yml")); err == nil {
+					root = dataRoot
+				}
+			}
+		}
+	}
+	if root == "" {
 		root = "."
 	}
 	python := os.Getenv("AGENT_EVAL_PYTHON")

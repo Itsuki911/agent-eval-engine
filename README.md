@@ -27,55 +27,89 @@ Agent Eval Engine は、AI Coding Agent の実行を **評価・記録・分析�
 
 ---
 
-## インストール
+## インストールと利用開始ステップ (Getting Started)
 
-### Windows (PowerShell)
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
-```
-※ `%LOCALAPPDATA%\Programs\AgentEvalEngine` にインストールされ、自動的に `PATH` に追加されます。
-
-### macOS / Linux
-GitHub Releases よりお使いの OS に対応したアーカイブ (`tar.gz`) をダウンロードし、解凍した `agent-eval` を `/usr/local/bin` 等に配置します。
-
-```bash
-tar -xzf agent-eval-<os>-<arch>.tar.gz
-chmod +x agent-eval
-sudo mv agent-eval /usr/local/bin/
-```
-詳細は [インストールガイド (docs/INSTALL.md)](docs/INSTALL.md) を参照してください。
+前提条件として **Docker Desktop**（または Docker Engine + Compose v2）が起動している必要があります。
+※ ホスト端末への Python や Go、PostgreSQL のインストールは不要です。**リポジトリの `git clone` も不要です。**
 
 ---
 
-## 最短の使い方 (Quick Start)
+### 最速スタート: 一般利用者向け (clone 不要)
 
-### 1. 初回セットアップ
-```bash
+GHCR (GitHub Container Registry) の事前ビルド済み Docker イメージを使用するため、リポジトリのクローンなしでワンライナーから直接導入できます。
+
+#### ■ Windows の場合 (PowerShell)
+```powershell
+# 1. ワンライナーでインストーラーを実行
+irm https://raw.githubusercontent.com/Itsuki911/agent-eval-engine/main/scripts/install.ps1 | iex
+
+# 2. 新しいターミナルを開き、初期化と環境診断 (Docker が GHCR から自動 pull)
 agent-eval init
-```
-OS 標準のデータ保存先を作成し、Docker コンテナの準備、データベースマイグレーション、サンプルベンチマークの展開、初期動作確認 (dry-run) を自動で行います。
-
-### 2. 環境診断
-```bash
 agent-eval doctor
-```
-Docker、DB、保存先、MCP 環境の健全性を診断し、問題があれば解決手順を日本語で案内します。
 
-### 3. TUI を起動する
-引数なしで実行すると、全画面 TUI が起動します。
-```bash
+# 3. TUI (画面) または CLI を起動
 agent-eval
 ```
-矢印キー・Enter で「新しい評価を開始」「Trace を見る」「Real Agent 記録取込」などを操作できます (`q` で終了、`Esc`/`b` で戻る)。
 
-### 4. CLI から評価を実行する
+#### ■ macOS / Linux の場合 (Bash / Zsh)
 ```bash
-agent-eval run GEN-TOOL-001
+# 1. ワンライナーでインストーラーを実行
+curl -fsSL https://raw.githubusercontent.com/Itsuki911/agent-eval-engine/main/scripts/install.sh | bash
+
+# 2. 新しいターミナルを開き、初期化と環境診断 (Docker が GHCR から自動 pull)
+agent-eval init
+agent-eval doctor
+
+# 3. TUI (画面) または CLI を起動
+agent-eval
 ```
-機械可読な JSON 出力が必要な場合:
+
+---
+
+### 開発者向け: リポジトリをクローンして利用する場合
+
+評価エンジン自体のコード変更や、独自ベンチマークの開発を行う場合:
+
 ```bash
+# 1. クローンして移動
+git clone https://github.com/Itsuki911/agent-eval-engine.git
+cd agent-eval-engine
+
+# 2. インストーラーを実行 (Windows: .\scripts\install.ps1 / macOS・Linux: ./scripts/install.sh)
+./scripts/install.sh # または powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+
+# 3. 初期化と起動
+agent-eval init
+agent-eval doctor
+agent-eval
+```
+詳細は [インストールガイド (docs/INSTALL.md)](docs/INSTALL.md) を参照してください。
+
+
+---
+
+## 主な使い方 (CLI)
+
+初期化完了後は、任意の作業ディレクトリから直接評価や分析を実行できます。
+
+### 1. ベンチマーク評価を実行する
+```bash
+# サンプルベンチマークを dry-run で評価実行 (LLM API 課金なし)
+agent-eval run GEN-TOOL-001
+
+# スクリプト連携用の機械可読 JSON を取得する場合
 agent-eval run GEN-TOOL-001 --json
 ```
+
+### 2. 実行履歴とメトリクスを確認する
+```bash
+# 実行履歴一覧
+agent-eval list
+
+# 特定の実行結果の詳細
+agent-eval show <run-id>
+```
+
 
 ---
 
