@@ -2,14 +2,14 @@
 
 ## 配布方式
 
-この MCP Server は、Smithery を発見・配布ページとして使い、評価エンジン自体は利用者の PC 上の Docker で実行します。Smithery 上で評価データ、PostgreSQL、OpenRouter API キー、実行履歴を保持しません。
+この MCP Server は、GitHub Releases を正規配布経路として使い、評価エンジン自体は利用者の PC 上の Docker で実行します。Smithery 上で評価データ、PostgreSQL、OpenRouter API キー、実行履歴を保持しません。
 
 - MCP transport: `stdio`（ローカルプロセス）
-- 配布物: GitHub Releases のソース／リリースノート
+- 配布物: GitHub Releases の `.mcpb` と SHA-256 checksum
 - 実行データ: 利用者のローカル PostgreSQL volume と `local-data/`
-- 公開対象: `apps/mcp/server.py` が公開する 7 ツール
+- 公開対象: `apps/mcp/server.py` が公開する 8 ツール
 
-Smithery の deployment API では `stdio` がローカル実行形式として定義されています。本プロジェクトは HTTP 公開を前提にしません。
+Smithery の deployment API では `stdio` がローカル実行形式として定義されています。本プロジェクトは HTTP 公開（`hosted_shttp`、`external_shttp` など）を前提にしません。
 
 ## Smithery 登録用の説明文
 
@@ -36,17 +36,15 @@ Agent Eval Engine は、generic と coding の benchmark を評価し、run、me
 | `get_errors` | エラーイベントを抽出 | なし |
 | `compare_runs` | 2 run の metrics を比較 | なし |
 | `run_regression` | 最大10件を連続評価 | あり |
+| `import_agent_trace` | 外部Agentの標準記録を取込 | あり |
 
 ## 公開前に利用者が行う作業
 
 1. GitHub Releases に動作確認済みの tag とリリースノートを公開する。
-2. Smithery にログインし、Free plan の公開数・可視性・利用制限をダッシュボードで確認する。
-3. `powershell -ExecutionPolicy Bypass -File .\scripts\build_mcpb.ps1` で `dist\agent-eval-engine.mcpb` を作成する。
-4. `smithery mcp publish .\dist\agent-eval-engine.mcpb -n neymar020510/agent-eval-engine` を実行する。
-5. HTTP URL を登録する `hosted_shttp`、`external_shttp` は選ばない。bundle はローカル stdio 実行用である。
-6. `docs/MCP_CLIENT_SETUP.md` の Windows 用起動コマンドを接続手順として掲載する。
-7. 公開ページで API キー、`.env`、ローカル絶対パス、PostgreSQL の接続文字列を入力・掲載していないことを確認する。
-8. 新規 Windows 利用者アカウントまたは別 PC で、E2E-MCP-003 を実施する。
+2. `docs/GITHUB_RELEASE_DISTRIBUTION.md` の手順で MCPB と checksum が添付されたことを確認する。
+3. `docs/MCP_CLIENT_SETUP.md` の Windows 用起動コマンドを接続手順として掲載する。
+4. 公開ページで API キー、`.env`、ローカル絶対パス、PostgreSQL の接続文字列を入力・掲載していないことを確認する。
+5. 新規 Windows 利用者アカウントまたは別 PC で、E2E-MCP-003 を実施する。
 
 Smithery の Free plan の条件は変更され得るため、公開直前に Smithery の料金ページとダッシュボードを正とします。このリポジトリは特定の無料枠や上限を前提にしていません。
 
@@ -57,6 +55,10 @@ Smithery の Free plan の条件は変更され得るため、公開直前に Sm
 - 脆弱性・破壊的変更は GitHub Release の release note と Smithery の説明欄に記載する。
 - 問い合わせに run ID や trace を含める場合でも、API キー、token、password を送信しない。
 - live LLM を利用する人には、利用者自身の API キーと費用負担であることを明示する。
+
+## 現在のSmithery公開状況
+
+2026-09-27 時点で Smithery CLI の MCPB publish は Registry 側の `400 No values to set` により保留する。このため `smithery mcp publish` を公開手順に含めない。GitHub Releases の MCPB 配布とローカル stdio 実行は利用できる。Smithery 側の不具合が解消された後、MCPB publish を別途検証する。
 
 ## 公式情報
 

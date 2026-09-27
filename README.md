@@ -1,106 +1,160 @@
+# Agent Eval Engine
 
-# Agent Evaluation Framework
+Agent Eval Engine は、AI Coding Agent の実行を **評価・記録・分析・比較** するローカル実行型の評価基盤です。
+評価データセットを使った dry-run / LLM 評価、実行履歴の時系列表示、実際の Coding Agent (Codex, OpenCode, Antigravity) の記録取込を行えます。
 
-AI エージェントを評価するための開発用フレームワークです。タスク成否だけでなく、ツール利用、回復性、安全性、コスト、遅延、実行履歴を記録・評価します。
+利用者は単一の `agent-eval` コマンドを通じて、直感的な TUI (ターミナルUI) や自動化向け CLI、MCP Server を利用できます。
 
-現在は、YAML benchmark・fixture、PostgreSQL 永続化、Python 評価エンジン、Go 製 TUI、利用者作成データセット、CSV 出力、および将来の Real Coding Agent 連携用 DB 基盤を提供します。
+---
 
-## 現在の構成
+## 主な機能
 
-| 領域 | 主な役割 |
-| --- | --- |
-| `benchmarks/` | generic / coding の評価データセット（YAML） |
-| `fixtures/` | ツール応答、workspace、セキュリティ境界などの再現環境 |
-| `packages/core/agent_eval/` | Python 評価エンジン、LLM 接続、評価、CSV 出力 |
-| `database/` | SQLAlchemy モデル、Repository、Alembic migration |
-| `apps/cli/` | Go 製の対話型 TUI |
-| `scripts/` | 評価実行、TUI バックエンド、sample package 作成 |
-| `tests/` | 自動テストと人間向け手動テストケース |
+- **ワンコマンド起動**: 単一バイナリ `agent-eval` から TUI または CLI を起動
+- **100% ローカル保存**: 評価データ、PostgreSQL、API キー、履歴はすべて利用者の PC 内に保持
+- **直感的な TUI**: キーボード操作で評価実行、Trace タイムライン再生、比較、Agent 記録取込
+- **Real Coding Agent 記録取込**: Codex, OpenCode, Antigravity などの実行記録 (`.jsonl`) を共通スキーマで分析
+- **MCP サーバー統合**: Codex や Antigravity 等の MCP Host からワンクリックで評価ツールを呼び出し
+- **環境自動診断**: `agent-eval doctor` による Docker・DB・設定の日本語診断と修復案内
 
-## 評価の流れ
+---
 
-```text
-benchmark YAML
-  -> fixture / 制約の読込
-  -> Python 評価エンジン
-  -> events / metrics / evaluations を PostgreSQL へ保存
-  -> Go TUI で run・Trace・結果を確認
-  -> 必要に応じて CSV をホスト側へ出力
+## 必要な環境
+
+- **OS**: Windows (x86_64, ARM64), macOS (Apple Silicon, Intel), Linux (x86_64)
+- **Docker Desktop** または **Docker Engine** (Compose v2 対応)
+  - 評価エンジン (Python) と PostgreSQL は Docker 内で安全に分離実行されます。
+  - ※ ホスト端末に Python や Go の開発環境をインストールする必要はありません。
+
+---
+
+## インストール
+
+### Windows (PowerShell)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
+※ `%LOCALAPPDATA%\Programs\AgentEvalEngine` にインストールされ、自動的に `PATH` に追加されます。
 
-1 回の評価は `runs` を親として保存します。`events` に順序付きの原文 payload を残すため、実行履歴を時系列で再構成できます。
-
-## Phase 2: PostgreSQL永続化基盤
-
-評価の1回の実行を、実行情報（`runs`）、順序付きイベント（`events`）、数値指標（`metrics`）、評価結果（`evaluations`）へ分けて保存します。`events`には入力やツール応答の原文をJSONBで保存するため、実行履歴を順序どおりに再現できます。
-
-### 初回設定
-
-1. `.env.example`を`.env`へコピーし、`POSTGRES_PASSWORD`をローカル用の値へ変更する。
-2. `docker compose up -d db`を実行する。
-3. `docker compose run --rm db-tools alembic upgrade head`を実行する。
-4. `docker compose run --rm db-tools`を実行する。
-
-期待結果: マイグレーションが成功し、テストが`runs`、`events`、`metrics`、`evaluations`を作成して、1件の実行ログからイベントと最終状態を完全に復元できることを確認します。
-
-ターミナルから確認する場合は、次を実行します。
+### macOS / Linux
+GitHub Releases よりお使いの OS に対応したアーカイブ (`tar.gz`) をダウンロードし、解凍した `agent-eval` を `/usr/local/bin` 等に配置します。
 
 ```bash
-docker compose exec db psql -U agent_eval -d agent_eval
+tar -xzf agent-eval-<os>-<arch>.tar.gz
+chmod +x agent-eval
+sudo mv agent-eval /usr/local/bin/
 ```
+詳細は [インストールガイド (docs/INSTALL.md)](docs/INSTALL.md) を参照してください。
 
-psql内の`\dt`でテーブル一覧を、`SELECT * FROM events;`で保存済みイベントを確認できます。原文には秘密情報が含まれる可能性があるため、ローカル開発環境以外で利用する前にマスキング方針を決めてください。
+---
 
-## Phase 3: Python評価エンジン
+## 最短の使い方 (Quick Start)
 
-LangGraphで、benchmark読込、実行、イベント収集、評価、PostgreSQL保存を順番に実行します。モデル設定は[configs/phase3-local.yaml](configs/phase3-local.yaml)、APIキーは`.env`の`OPENROUTER_API_KEY`で管理します。
-
-### dry-runの実行
-
-初回は外部APIを呼ばないdry-runを使います。`.env.example`を`.env`へコピーしてDBパスワードを設定した後、次を実行します。
-
+### 1. 初回セットアップ
 ```bash
-docker compose --profile engine build engine
-docker compose --profile engine run --rm engine python scripts/run_evaluation.py --benchmark benchmarks/generic/GEN-TOOL-001.yaml
+agent-eval init
 ```
+OS 標準のデータ保存先を作成し、Docker コンテナの準備、データベースマイグレーション、サンプルベンチマークの展開、初期動作確認 (dry-run) を自動で行います。
 
-期待結果: 最後に表示されるJSONの`status`が`simulated`になり、`run_id`、`event_count`、評価指標が表示されます。イベント、指標、評価結果はPostgreSQLへ保存されます。
-
-### OpenRouterを使う実行
-
-`configs/phase3-local.yaml`の`engine.dry_run`を`false`へ変更し、`.env`の`OPENROUTER_API_KEY`に有効なキーを設定してから同じコマンドを実行します。実行時はAPI費用が発生する可能性があります。Phase 3ではツール・workspaceを実行しないため、`simulated`は実ツール評価の結果ではありません。
-
-## Phase 4: Go TUIと評価エンジンの統合
-
-TUIのモック表示だけを確認する場合は、次を実行します。DB、Python評価エンジン、LLM APIは使用しません。
-
+### 2. 環境診断
 ```bash
-docker compose --profile cli run --rm --build cli
+agent-eval doctor
 ```
+Docker、DB、保存先、MCP 環境の健全性を診断し、問題があれば解決手順を日本語で案内します。
 
-PostgreSQLに保存された実行履歴の表示、Python評価エンジンによる評価開始、実行イベントのTimeline表示を確認する場合は、統合TUIを実行します。起動時にDB migrationを確認・適用します。
-
+### 3. TUI を起動する
+引数なしで実行すると、全画面 TUI が起動します。
 ```bash
-docker compose --profile tui run --rm --build tui
+agent-eval
 ```
+矢印キー・Enter で「新しい評価を開始」「Trace を見る」「Real Agent 記録取込」などを操作できます (`q` で終了、`Esc`/`b` で戻る)。
 
-統合TUIはGoからPython subprocessを呼び出し、Pythonが評価・DB操作を担当します。初期設定ではdry-runのため外部APIを呼びません。`configs/phase3-local.yaml`の`engine.dry_run`を`false`へ変更した場合だけ、確認画面からの実行でOpenRouter APIを使用します。
-
-## はじめ方
-
+### 4. CLI から評価を実行する
 ```bash
-python scripts/generate_phase1_benchmarks.py
-python scripts/validate_phase1.py --check-fixtures
+agent-eval run GEN-TOOL-001
 ```
-
-Dockerを利用できる環境では、次も実行できます。
-
+機械可読な JSON 出力が必要な場合:
 ```bash
-docker compose build evaluator
-docker compose run --rm evaluator
+agent-eval run GEN-TOOL-001 --json
 ```
 
-詳細は、[benchmarks/README.md](benchmarks/README.md)、[fixtures/README.md](fixtures/README.md)、
-[database/README.md](database/README.md)、[docker/README.md](docker/README.md)、[docs/PHASE1_WORK_REPORT.md](docs/PHASE1_WORK_REPORT.md)を参照してください。
+---
 
+## Real Coding Agent の記録を取り込む
 
+Codex や OpenCode が出力した実行トランスクリプト (`.jsonl`) を取り込み、時系列 Trace を分析できます。
+
+### 1. 形式の事前検証
+```bash
+agent-eval validate-trace fixtures/agent-traces/codex-success.jsonl
+```
+
+### 2. 取り込み実行
+```bash
+agent-eval import-trace fixtures/agent-traces/codex-success.jsonl
+```
+
+### 3. Trace タイムラインの確認
+```bash
+agent-eval trace <run-id>
+```
+※ 安全のため、API キーや Authorization ヘッダー、不正なパストラバーサルを含むファイルは自動的に拒否されます。詳細は [Trace 取込ガイド (docs/TRACE_GUIDE.md)](docs/TRACE_GUIDE.md) を参照してください。
+
+---
+
+## Codex / MCP Host から利用する
+
+### 1. Codex へのワンコマンド登録
+```bash
+agent-eval mcp install codex
+```
+自動的に Codex へ `agent-eval mcp serve --stdio` が登録されます。
+
+### 2. 手動登録の場合
+```bash
+codex mcp add agent-eval -- agent-eval mcp serve --stdio
+```
+標準入出力 (stdio) 経由で `run_benchmark`, `get_trace`, `compare_runs`, `import_agent_trace` などのツールが利用可能になります。
+詳細は [Codex MCP 接続ガイド (docs/MCP_CODEX_GUIDE.md)](docs/MCP_CODEX_GUIDE.md) を参照してください。
+
+---
+
+## ユーザーデータの保存先
+
+ユーザーのデータはリポジトリ外の OS 標準ディレクトリに安全に分離保存されます。
+
+- **Windows**: `%LOCALAPPDATA%\AgentEvalEngine\`
+- **macOS**: `~/Library/Application Support/AgentEvalEngine/`
+- **Linux**: `~/.local/share/agent-eval-engine/`
+
+保存内容:
+- `config/`: 設定ファイル (`.env`)
+- `datasets/`: ユーザー独自ベンチマーク
+- `agent-traces/`: 取り込んだトランスクリプト
+- `exports/`: CSV 出力ファイル
+- `logs/`: 実行ログ・MCP 通信ログ
+- `diagnostics/`: 診断レポート
+
+---
+
+## ドキュメント一覧
+
+- [インストールガイド (docs/INSTALL.md)](docs/INSTALL.md)
+- [セットアップと初期化 (docs/SETUP.md)](docs/SETUP.md)
+- [TUI 操作ガイド (docs/TUI_GUIDE.md)](docs/TUI_GUIDE.md)
+- [Codex MCP 接続ガイド (docs/MCP_CODEX_GUIDE.md)](docs/MCP_CODEX_GUIDE.md)
+- [OpenCode MCP 接続ガイド (docs/MCP_OPENCODE_GUIDE.md)](docs/MCP_OPENCODE_GUIDE.md)
+- [Google Antigravity MCP 接続ガイド (docs/MCP_ANTIGRAVITY_GUIDE.md)](docs/MCP_ANTIGRAVITY_GUIDE.md)
+- [Real Agent トレース取込ガイド (docs/TRACE_GUIDE.md)](docs/TRACE_GUIDE.md)
+- [トラブルシューティング (docs/TROUBLESHOOTING.md)](docs/TROUBLESHOOTING.md)
+- [よくある質問 (FAQ) (docs/FAQ.md)](docs/FAQ.md)
+- [セキュリティとプライバシー (docs/SECURITY_PRIVACY.md)](docs/SECURITY_PRIVACY.md)
+- [アップグレードとアンインストール (docs/UNINSTALL_UPGRADE.md)](docs/UNINSTALL_UPGRADE.md)
+- [GitHub Releases 配布と SBOM (docs/GITHUB_RELEASE_DISTRIBUTION.md)](docs/GITHUB_RELEASE_DISTRIBUTION.md)
+
+---
+
+## セキュリティ
+
+- 本ツールは完全ローカル完結型です。明示的に外部 LLM API を設定しない限り、外部通信は一切発生しません。
+- ログやトレース、診断出力には API キーやパスワード等の秘密情報は一切含まれません。
+- 脆弱性報告等は [セキュリティポリシー (SECURITY.md)](SECURITY.md) をご確認ください。

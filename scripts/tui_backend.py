@@ -16,12 +16,14 @@ from agent_eval.benchmark import get_benchmark_template, load_benchmark, save_cu
 from agent_eval.config import load_settings
 from agent_eval.events import CollectedEvent
 from agent_eval.exporter import export_runs_to_csv, get_display_download_path
+from agent_eval.real_agent_adapter import import_agent_transcript, load_agent_transcript
 from agent_eval.sample_package import download_sample_package, install_sample_package
 from agent_eval.workflow import EvaluationResult, EvaluationService
-from database.migration import upgrade_database
+from database.migration import create_alembic_config, upgrade_database
 from database.models import Run
 from database.repositories import RunRepository
 from database.session import create_session_factory
+from alembic.script import ScriptDirectory
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +73,11 @@ def parse_args() -> argparse.Namespace:
     download_parser = subparsers.add_parser("download-sample")
     download_parser.add_argument("--url", required=True)
     download_parser.add_argument("--sha256", required=True)
+    subparsers.add_parser("doctor")
+    validate_trace_parser = subparsers.add_parser("validate-trace")
+    validate_trace_parser.add_argument("--file", required=True)
+    import_trace_parser = subparsers.add_parser("import-trace")
+    import_trace_parser.add_argument("--file", required=True)
     return parser.parse_args()
 
 
@@ -306,12 +313,28 @@ def execute_database_command(args: argparse.Namespace) -> dict[str, Any]:
     raise ValueError(f"unsupported command: {args.command}")
 
 
+# 評価対象のパスを解決する
+def resolve_benchmark_path(benchmark_arg: str) -> Path:
+    direct = Path(benchmark_arg)
+    if direct.is_file():
+        return direct
+    for family in ("generic", "coding"):
+        candidate = PROJECT_ROOT / "benchmarks" / family / f"{benchmark_arg}.yaml"
+        if candidate.is_file():
+            return candidate
+        user_candidate = user_dataset_root() / family / f"{benchmark_arg}.yaml"
+        if user_candidate.is_file():
+            return user_candidate
+    raise FileNotFoundError(f"benchmark not found: {benchmark_arg}")
+
+
 # 評価実行を開始する
 def execute_run(args: argparse.Namespace) -> dict[str, Any]:
     settings = load_settings(args.config)
     session_factory = create_session_factory()
+    target_path = resolve_benchmark_path(args.benchmark)
     with session_factory() as session:
-        result = EvaluationService(settings, session, event_listener=print_progress).run(args.benchmark)
+        result = EvaluationService(settings, session, event_listener=print_progress).run(str(target_path))
     return result_output(result)
 
 
@@ -382,6 +405,51 @@ def execute_download_sample(args: argparse.Namespace) -> dict[str, Any]:
     return {"status": "installed", "path": str(target)}
 
 
+# トレースファイルを検証する
+def execute_validate_trace(args: argparse.Namespace) -> dict[str, Any]:
+    transcript = load_agent_transcript(Path(args.file))
+    return {
+        "status": "valid",
+        "adapter_type": transcript.adapter_type,
+        "benchmark_id": transcript.benchmark_id,
+        "agent_name": transcript.agent_name,
+        "event_count": len(transcript.events),
+        "task_success": transcript.task_success,
+    }
+
+
+# トレースファイルをDBへ取り込む
+def execute_import_trace(args: argparse.Namespace) -> dict[str, Any]:
+    session_factory = create_session_factory()
+    with session_factory() as session:
+        return import_agent_transcript(RunRepository(session), Path(args.file))
+
+
+# システム状態を診断する
+def execute_doctor(args: argparse.Namespace) -> dict[str, Any]:
+    db_status = "connected"
+    try:
+        session_factory = create_session_factory()
+        with session_factory() as session:
+            RunRepository(session).count_runs()
+    except Exception as error:
+        db_status = f"error: {error}"
+
+    migration_status = "unknown"
+    try:
+        config = create_alembic_config()
+        migration_status = ScriptDirectory.from_config(config).get_current_head() or "head"
+    except Exception as error:
+        migration_status = f"error: {error}"
+
+    storage_root = os.environ.get("AGENT_EVAL_DATA_DIR", str(PROJECT_ROOT / "local-data"))
+    return {
+        "database": db_status,
+        "migrations": migration_status,
+        "storage": storage_root,
+    }
+
+
 # TUI境界を開始する
 def main() -> int:
     args = parse_args()
@@ -402,11 +470,17 @@ def main() -> int:
             output = execute_install_sample(args)
         elif args.command == "download-sample":
             output = execute_download_sample(args)
+        elif args.command == "validate-trace":
+            output = execute_validate_trace(args)
+        elif args.command == "import-trace":
+            output = execute_import_trace(args)
+        elif args.command == "doctor":
+            output = execute_doctor(args)
         else:
             output = execute_database_command(args)
     except Exception as error:
         print(
-            json.dumps({"type": "error", "error_type": type(error).__name__}),
+            json.dumps({"type": "error", "error_type": type(error).__name__, "message": str(error)}, ensure_ascii=False),
             file=sys.stderr,
             flush=True,
         )

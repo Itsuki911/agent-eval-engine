@@ -15,11 +15,12 @@ from sqlalchemy.orm import Session
 
 from agent_eval.config import Phase3Settings, load_settings
 from agent_eval.workflow import EvaluationResult, EvaluationService
-from apps.api.schemas import CreateEventRequest, CreateRunRequest, EvaluateRequest, FinishRunRequest
+from apps.api.schemas import CreateEventRequest, CreateRunRequest, EvaluateRequest, FinishRunRequest, ImportTranscriptRequest
 from database.migration import upgrade_database
 from database.repositories import RunRepository
 from database.repositories.run_repository import reject_secret_configuration
 from database.session import create_session_factory
+from agent_eval.real_agent_adapter import TranscriptError, import_agent_transcript, resolve_agent_transcript_path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +40,12 @@ def user_dataset_root() -> Path:
     if configured:
         return Path(configured).expanduser().resolve() / "datasets" / "user"
     return PROJECT_ROOT / "benchmarks" / "user"
+
+
+# Agent記録の許可保存先を返す
+def agent_trace_root() -> Path:
+    configured = os.environ.get("AGENT_EVAL_AGENT_TRACE_DIR")
+    return Path(configured).expanduser().resolve() if configured else PROJECT_ROOT / "local-data" / "agent-traces"
 
 
 # 指定IDのbenchmarkを安全に解決する
@@ -172,6 +179,16 @@ def create_app(
             session.rollback()
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
         return run_summary(run)
+
+    # 外部Agentの標準記録を取り込む
+    @app.post("/agent-transcripts/import", status_code=status.HTTP_201_CREATED)
+    def import_transcript(request: ImportTranscriptRequest, session: Session = Depends(get_session)) -> dict[str, Any]:
+        try:
+            transcript_path = resolve_agent_transcript_path(agent_trace_root(), request.transcript_file)
+            return import_agent_transcript(RunRepository(session), transcript_path)
+        except TranscriptError as error:
+            session.rollback()
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
 
     # 実行履歴の一覧を返す
     @app.get("/runs")

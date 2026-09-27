@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 import pytest
 from alembic import command
@@ -188,3 +189,21 @@ def test_compare_returns_metric_differences(api_client: TestClient) -> None:
         metric_count=len(response.json()["metrics"]),
         compared_runs=2,
     )
+
+
+# APIから外部Agent記録を取り込む
+def test_import_agent_transcript_returns_persisted_run(api_client: TestClient, monkeypatch, tmp_path) -> None:
+    trace_root = tmp_path / "agent-traces"
+    trace_root.mkdir()
+    shutil.copy(PROJECT_ROOT / "fixtures" / "agent-traces" / "codex-success.jsonl", trace_root)
+    monkeypatch.setenv("AGENT_EVAL_AGENT_TRACE_DIR", str(trace_root))
+
+    response = api_client.post("/agent-transcripts/import", json={"transcript_file": "codex-success.jsonl"})
+
+    assert response.status_code == 201
+    result = response.json()
+    assert result["adapter_type"] == "codex"
+    assert result["event_count"] == 3
+    details = api_client.get(f"/runs/{result['run_id']}")
+    assert details.json()["agent_executions"][0]["status"] == "completed"
+    print_test_result("api_import_agent_transcript", "passed", run_id=result["run_id"], event_count=result["event_count"])

@@ -11,8 +11,9 @@ from mcp.server import MCPServer
 from sqlalchemy.orm import Session
 
 from agent_eval.config import Phase3Settings, load_settings
-from agent_eval.workflow import EvaluationResult, EvaluationService
-from apps.api.main import evaluation_output, resolve_benchmark, settings_path
+from agent_eval.real_agent_adapter import import_agent_transcript, resolve_agent_transcript_path
+from agent_eval.workflow import EvaluationService
+from apps.api.main import agent_trace_root, evaluation_output, resolve_benchmark, settings_path
 from database.migration import upgrade_database
 from database.repositories import RunRepository
 from database.session import create_session_factory
@@ -141,6 +142,14 @@ class EvaluationMCPService:
             "runs": results,
         }
 
+    # 外部Agentの標準記録を取り込む
+    def import_agent_trace(self, transcript_file: str) -> dict[str, Any]:
+        self._ensure_migration()
+        transcript_path = resolve_agent_transcript_path(agent_trace_root(), transcript_file)
+        with self._session_factory() as session:
+            result = import_agent_transcript(RunRepository(session), transcript_path)
+        return redact_secrets(result)
+
 
 # MCP Serverを生成する
 def create_server(service: EvaluationMCPService | None = None) -> MCPServer:
@@ -191,6 +200,12 @@ def create_server(service: EvaluationMCPService | None = None) -> MCPServer:
     def run_regression(benchmark_ids: list[str], source: str = "sample") -> dict[str, Any]:
         """最大10件のbenchmarkを回帰評価する。"""
         return current_service.run_regression(benchmark_ids, source)
+
+    # 外部Agent記録の取込ツールを公開する
+    @server.tool()
+    def import_agent_trace(transcript_file: str) -> dict[str, Any]:
+        """許可フォルダの外部Agent記録を保存する。"""
+        return current_service.import_agent_trace(transcript_file)
 
     return server
 

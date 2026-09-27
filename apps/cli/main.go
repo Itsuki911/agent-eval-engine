@@ -33,6 +33,10 @@ const (
 	userBenchmarkYAMLScreen screenName = "user-benchmark-yaml"
 	searchScreen            screenName = "search"
 	helpScreen              screenName = "help"
+	wizardScreen            screenName = "wizard"
+	importTraceScreen       screenName = "import-trace"
+	mcpScreen               screenName = "mcp"
+	doctorScreen            screenName = "doctor"
 
 	backgroundStyle = "\033[38;2;192;202;245;48;2;26;27;38m"
 	cyanStyle       = "\033[38;2;125;207;255;48;2;26;27;38m"
@@ -116,6 +120,16 @@ type appState struct {
 	userBenchmarkYAML    string
 	userBenchmarkPath    string
 	userBenchmarkOffset  int
+	wizardStep           int
+	wizardTotal          int
+	importTracePath      string
+	importTraceResult    *traceValidationResult
+	importTraceError     string
+	importTraceSuccess   string
+	importTraceInput     bool
+	doctorReport         *doctorReport
+	doctorIndex          int
+	mcpIndex             int
 }
 
 // 指定色の文字列を返す
@@ -257,6 +271,14 @@ func render(state appState, output io.Writer) error {
 		content = renderSearch(state.searchIndex)
 	case helpScreen:
 		content = renderHelp()
+	case wizardScreen:
+		content = renderWizard(state)
+	case importTraceScreen:
+		content = renderImportTrace(state)
+	case mcpScreen:
+		content = renderMCP(state)
+	case doctorScreen:
+		content = renderDoctor(state)
 	default:
 		return fmt.Errorf("unknown screen: %s", state.screen)
 	}
@@ -350,12 +372,14 @@ func renderHome(selectedIndex int) string {
 		label       string
 		description string
 	}{
-		{"評価結果を見る", "過去の実行履歴・結果・Traceを確認"},
-		{"Agentの動きを見る", "AIが行った処理を時系列で確認"},
-		{"新しい評価を開始する", "benchmarkを選び、dry-runから安全に開始"},
-		{"保存済みデータを探す", "benchmark・状態・run IDから実行履歴を検索"},
-		{"自作benchmarkを確認する", "自分で保存したYAMLを閲覧（評価は実行しません）"},
-		{"ヘルプ", "操作方法と用語を確認"},
+		{"新しい評価を開始する", "benchmarkを選び、dry-runから安全に開始 (新しい評価を開始)"},
+		{"評価結果を見る", "過去の実行履歴・結果・指標を確認 (保存済みデータを探す)"},
+		{"時系列 Trace を見る", "AIが行った処理とツール呼出を時系列で確認"},
+		{"Real Agent 記録を取り込む", "Codex / OpenCode / Antigravity の JSONL 記録を保存"},
+		{"自作benchmarkを確認する", "自作 Benchmark を管理する・作成・YAML確認"},
+		{"MCP 接続を設定する", "Codex / OpenCode / Antigravity との連携設定"},
+		{"設定・診断 (Doctor)", "Docker、DB、マイグレーション、データ保存先の診断"},
+		{"ヘルプ", "操作方法と使い方を確認"},
 	}
 	if selectedIndex < 0 {
 		selectedIndex = 0
@@ -364,11 +388,11 @@ func renderHome(selectedIndex int) string {
 		selectedIndex = len(options) - 1
 	}
 	lines := []string{
-		paint(cyanStyle, "AGENT EVAL  |  AI Agent Evaluation Framework"),
-		paint(slateStyle, "AI Agentの評価を実行・確認するターミナルツール (Phase 4 Mockup)"),
+		paint(cyanStyle, "AGENT EVAL ENGINE  |  AI Agent Evaluation Platform"),
+		paint(slateStyle, "ターミナルから AI Agent を評価・記録・比較する基盤ツール"),
 		paint(cyanStyle, divider),
 		paint(purpleStyle, "何をしますか？ (メニュー番号または矢印キーで選択)"),
-		paint(greenStyle, "  [c] Benchmark作成ボタン ── 入力形式で評価を作成・保存"),
+		paint(greenStyle, "  [w] 初回設定ウィザード ── Docker確認・DB初期化・サンプル導入"),
 		"",
 	}
 	for index, option := range options {
@@ -376,7 +400,7 @@ func renderHome(selectedIndex int) string {
 	}
 	lines = append(lines,
 		paint(cyanStyle, divider),
-		paint(blueStyle, "↑↓ 選択     [1-6] 番号選択     c 作成     Enter 開く     ? ヘルプ     q 終了"),
+		paint(blueStyle, "↑↓ 選択     [1-8] 番号選択     w ウィザード     Enter 開く     ? ヘルプ     q 終了"),
 	)
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -1632,18 +1656,59 @@ func nextState(state appState, key string) (appState, bool) {
 		case homeScreen:
 			switch state.homeIndex {
 			case 0:
-				state.screen = runsScreen
+				state.screen = newEvalScreen
 			case 1:
+				state.screen = runsScreen
+			case 2:
 				state.screen = traceScreen
 				state.traceIndex = 2
-			case 2:
-				state.screen = newEvalScreen
 			case 3:
-				state.screen = searchScreen
+				state.screen = importTraceScreen
 			case 4:
 				state.screen = userBenchmarkScreen
 			case 5:
+				state.screen = mcpScreen
+			case 6:
+				state.screen = doctorScreen
+				if state.doctorReport == nil {
+					report := runSystemDiagnostics(context.Background())
+					state.doctorReport = &report
+				}
+			case 7:
 				state.screen = helpScreen
+			}
+		case wizardScreen:
+			if state.wizardTotal == 0 {
+				state.wizardTotal = 5
+			}
+			if state.wizardStep < state.wizardTotal-1 {
+				state.wizardStep++
+			} else {
+				state.screen = homeScreen
+			}
+		case importTraceScreen:
+			targetPath := state.importTracePath
+			if targetPath == "" {
+				targetPath = "fixtures/agent-traces/codex-success.jsonl"
+			}
+			valRes, err := validateTraceFile(targetPath)
+			if err != nil {
+				state.importTraceError = err.Error()
+				state.importTraceResult = nil
+			} else {
+				state.importTraceResult = &valRes
+				state.importTraceError = ""
+				if state.backend {
+					client := newBackendClient()
+					_, impErr := client.execute(context.Background(), []string{"import-trace", "--file", targetPath}, nil)
+					if impErr != nil {
+						state.importTraceError = impErr.Error()
+					} else {
+						state.importTraceSuccess = fmt.Sprintf("取込完了: %s (%d events)", valRes.AdapterType, valRes.EventCount)
+					}
+				} else {
+					state.importTraceSuccess = fmt.Sprintf("取込完了: %s (%d events)", valRes.AdapterType, valRes.EventCount)
+				}
 			}
 		case userBenchmarkScreen:
 			if len(state.userBenchmarks) > 0 {
@@ -1691,23 +1756,23 @@ func nextState(state appState, key string) (appState, bool) {
 	case "1":
 		if state.screen == homeScreen {
 			state.homeIndex = 0
-			state.screen = runsScreen
+			state.screen = newEvalScreen
 		}
 	case "2":
 		if state.screen == homeScreen {
 			state.homeIndex = 1
-			state.screen = traceScreen
-			state.traceIndex = 2
+			state.screen = runsScreen
 		}
 	case "3":
 		if state.screen == homeScreen {
 			state.homeIndex = 2
-			state.screen = newEvalScreen
+			state.screen = traceScreen
+			state.traceIndex = 2
 		}
 	case "4":
 		if state.screen == homeScreen {
 			state.homeIndex = 3
-			state.screen = searchScreen
+			state.screen = importTraceScreen
 		}
 	case "5":
 		if state.screen == homeScreen {
@@ -1717,7 +1782,68 @@ func nextState(state appState, key string) (appState, bool) {
 	case "6":
 		if state.screen == homeScreen {
 			state.homeIndex = 5
+			state.screen = mcpScreen
+		}
+	case "7":
+		if state.screen == homeScreen {
+			state.homeIndex = 6
+			state.screen = doctorScreen
+			if state.doctorReport == nil {
+				report := runSystemDiagnostics(context.Background())
+				state.doctorReport = &report
+			}
+		}
+	case "8":
+		if state.screen == homeScreen {
+			state.homeIndex = 7
 			state.screen = helpScreen
+		}
+	case "w":
+		if state.screen == homeScreen {
+			state.screen = wizardScreen
+			state.wizardStep = 0
+			state.wizardTotal = 5
+		}
+	case "v":
+		if state.screen == importTraceScreen {
+			targetPath := state.importTracePath
+			if targetPath == "" {
+				targetPath = "fixtures/agent-traces/codex-success.jsonl"
+			}
+			valRes, err := validateTraceFile(targetPath)
+			if err != nil {
+				state.importTraceError = err.Error()
+				state.importTraceResult = nil
+			} else {
+				state.importTraceResult = &valRes
+				state.importTraceError = ""
+			}
+		}
+	case "i":
+		if state.screen == importTraceScreen {
+			targetPath := state.importTracePath
+			if targetPath == "" {
+				targetPath = "fixtures/agent-traces/codex-success.jsonl"
+			}
+			valRes, err := validateTraceFile(targetPath)
+			if err != nil {
+				state.importTraceError = err.Error()
+				state.importTraceResult = nil
+			} else {
+				state.importTraceResult = &valRes
+				state.importTraceError = ""
+				if state.backend {
+					client := newBackendClient()
+					_, impErr := client.execute(context.Background(), []string{"import-trace", "--file", targetPath}, nil)
+					if impErr != nil {
+						state.importTraceError = impErr.Error()
+					} else {
+						state.importTraceSuccess = fmt.Sprintf("取込完了: %s (%d events)", valRes.AdapterType, valRes.EventCount)
+					}
+				} else {
+					state.importTraceSuccess = fmt.Sprintf("取込完了: %s (%d events)", valRes.AdapterType, valRes.EventCount)
+				}
+			}
 		}
 	case "d":
 		state.screen = detailScreen
@@ -1829,7 +1955,10 @@ func nextState(state appState, key string) (appState, bool) {
 			state.filterInput = true
 		}
 	case "r":
-		if state.screen == errorScreen {
+		if state.screen == doctorScreen {
+			report := runSystemDiagnostics(context.Background())
+			state.doctorReport = &report
+		} else if state.screen == errorScreen {
 			state.screen = confirmScreen
 			state.confirmIndex = 0
 		} else {
@@ -1842,10 +1971,22 @@ func nextState(state appState, key string) (appState, bool) {
 			state.screen = errorScreen
 			state.errorKind = "openrouter"
 		}
+	case "h":
+		if state.screen == wizardScreen || state.screen == importTraceScreen || state.screen == mcpScreen || state.screen == doctorScreen {
+			state.screen = homeScreen
+		}
 	case "b":
 		switch state.screen {
 		case userBenchmarkYAMLScreen:
 			state.screen = userBenchmarkScreen
+		case wizardScreen:
+			if state.wizardStep > 0 {
+				state.wizardStep--
+			} else {
+				state.screen = homeScreen
+			}
+		case importTraceScreen, mcpScreen, doctorScreen:
+			state.screen = homeScreen
 		case detailScreen, traceScreen, compareScreen, confirmScreen, errorScreen:
 			state.screen = runsScreen
 		default:
@@ -1861,6 +2002,16 @@ func nextState(state appState, key string) (appState, bool) {
 	case "n":
 		if state.screen == confirmScreen {
 			state.screen = runsScreen
+		}
+		if state.screen == wizardScreen {
+			if state.wizardTotal == 0 {
+				state.wizardTotal = 5
+			}
+			if state.wizardStep < state.wizardTotal-1 {
+				state.wizardStep++
+			} else {
+				state.screen = homeScreen
+			}
 		}
 	case "up":
 		if state.screen == homeScreen && state.homeIndex > 0 {
@@ -1913,7 +2064,7 @@ func nextState(state appState, key string) (appState, bool) {
 			state.comparisonOffset = max(0, state.comparisonOffset-pageSize(state))
 		}
 	case "down":
-		if state.screen == homeScreen && state.homeIndex < 5 {
+		if state.screen == homeScreen && state.homeIndex < 7 {
 			state.homeIndex++
 		}
 		if state.screen == userBenchmarkScreen && state.userBenchmarkIndex < len(state.userBenchmarks)-1 {
@@ -2397,6 +2548,21 @@ func runTerminal(state appState) error {
 
 // プログラムを開始する
 func main() {
+	if len(os.Args) > 1 {
+		firstArg := os.Args[1]
+		isTUIFlag := strings.HasPrefix(firstArg, "-screen") || strings.HasPrefix(firstArg, "--screen") ||
+			strings.HasPrefix(firstArg, "-no-clear") || strings.HasPrefix(firstArg, "--no-clear") ||
+			strings.HasPrefix(firstArg, "-demo-error") || strings.HasPrefix(firstArg, "--demo-error") ||
+			strings.HasPrefix(firstArg, "-backend") || strings.HasPrefix(firstArg, "--backend")
+
+		if !isTUIFlag {
+			if err := executeCLI(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+				os.Exit(1)
+			}
+			return
+		}
+	}
+
 	state := parseFlags()
 	if err := runTerminal(state); err != nil {
 		fmt.Fprintln(os.Stderr, err)

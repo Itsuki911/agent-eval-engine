@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -72,3 +73,18 @@ def test_mcp_compare_runs_returns_metrics(service: EvaluationMCPService) -> None
     assert comparison["left_run_id"] == left["run_id"]
     assert any(metric["name"] == "success.task_success" for metric in comparison["metrics"])
     print_test_result("mcp_compare_runs_returns_metrics", "passed", compared_runs=2, metric_count=len(comparison["metrics"]))
+
+
+# MCPから外部Agent記録を取り込む
+def test_mcp_import_agent_trace_persists_run(service: EvaluationMCPService, monkeypatch, tmp_path) -> None:
+    trace_root = tmp_path / "agent-traces"
+    trace_root.mkdir()
+    shutil.copy(PROJECT_ROOT / "fixtures" / "agent-traces" / "codex-success.jsonl", trace_root)
+    monkeypatch.setenv("AGENT_EVAL_AGENT_TRACE_DIR", str(trace_root))
+
+    result = service.import_agent_trace("codex-success.jsonl")
+    details = service.get_run(result["run_id"])
+
+    assert result["status"] == "completed"
+    assert details["agent_executions"][0]["adapter_type"] == "codex"
+    print_test_result("mcp_import_agent_trace", "passed", run_id=result["run_id"], event_count=result["event_count"])

@@ -50,3 +50,10 @@ class FinishRunRequest(BaseModel):
     final_state: dict[str, Any] = Field(default_factory=dict)
     failure_category: str | None = Field(default=None, max_length=32)
     llm_cost_usd: float | None = Field(default=None, ge=0)
+
+
+# 外部Agent記録の取込要求を表す
+class ImportTranscriptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transcript_file: str = Field(min_length=1, max_length=512)

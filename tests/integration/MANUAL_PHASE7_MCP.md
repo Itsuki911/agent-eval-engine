@@ -18,7 +18,7 @@ docker compose --profile engine run --rm engine mcp dev apps/mcp/server.py
 
 期待結果:
 
-- `run_benchmark`、`evaluate_agent`、`get_run`、`get_trace`、`get_errors`、`compare_runs`、`run_regression` の7件が表示される。
+- `run_benchmark`、`evaluate_agent`、`get_run`、`get_trace`、`get_errors`、`compare_runs`、`run_regression`、`import_agent_trace` の8件が表示される。
 - 任意コマンドやURLを入力するツールは表示されない。
 
 ## IT-MCP-002：run_benchmarkでdry-run評価を保存できる

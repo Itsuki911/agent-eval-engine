@@ -60,12 +60,14 @@ if ($SecretFiles) {
     throw "Secret environment files cannot be included in a bundle"
 }
 
-& npx.cmd --yes @anthropic-ai/mcpb validate $StagingRoot
+$NpxCommand = if ($env:OS -eq "Windows_NT") { "npx.cmd" } else { "npx" }
+
+& $NpxCommand --yes @anthropic-ai/mcpb validate $StagingRoot
 if ($LASTEXITCODE -ne 0) {
     throw "MCPB manifest validation failed"
 }
 
-& npx.cmd --yes @anthropic-ai/mcpb pack $StagingRoot $BundleOutput
+& $NpxCommand --yes @anthropic-ai/mcpb pack $StagingRoot $BundleOutput
 if ($LASTEXITCODE -ne 0) {
     throw "MCPB bundle creation failed"
 }

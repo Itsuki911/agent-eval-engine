@@ -1,6 +1,6 @@
 # MCPB 配布手動E2Eテスト
 
-## E2E-MCPB-001：MCPB bundleを作成してSmithery公開用ファイルを生成できる
+## E2E-MCPB-001：MCPB bundleを作成してGitHub Releases配布用ファイルを生成できる
 
 - 種別: 正常系
 
@@ -19,7 +19,7 @@ npx.cmd --yes @anthropic-ai/mcpb info .\dist\agent-eval-engine.mcpb
 
 - `dist\agent-eval-engine.mcpb` が1個作成される。
 - manifest の名前は `agent-eval-engine`、version は `0.1.0` である。
-- bundle は `run_benchmark`、`get_trace`、`compare_runs` を含む7ツールの定義を持つ。
+- bundle は `tools_generated: true` を持ち、起動後の `tools/list` で8ツールを返す。
 - bundle 内に `.env` または `.env.*` が含まれない。
 - bundle は既定でホスト側 PostgreSQL ポート `15432` を使い、開発用の `5432` と衝突しない。
 
@@ -45,25 +45,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_mcpb.ps1
 - 生成済み bundle に `OPENROUTER_API_KEY=not-a-real-key` は含まれない。
 - 実在する API キーをテストデータに使用しない。
 
-## E2E-MCPB-003：MCPB bundleをSmitheryへ公開できる
+## E2E-MCPB-003：Smithery公開の保留状態を確認できる
 
 - 種別: 正常系
 
 ```powershell
-smithery auth whoami
-smithery namespace use neymar020510
-smithery mcp publish .\dist\agent-eval-engine.mcpb -n neymar020510/agent-eval-engine
+Get-Content .\docs\GITHUB_RELEASE_DISTRIBUTION.md
 ```
 
 手順:
 
 1. bundle 作成済みであることを確認する。
 2. コマンドを実行する。
-3. Smithery の公開結果を確認する。
+3. Smithery の公開方針を確認する。
 
 期待結果:
 
-- 認証済みの Smithery アカウントが表示される。
-- `agent-eval-engine.mcpb` が指定され、ENOENT は発生しない。
-- `neymar020510/agent-eval-engine` として公開処理が開始または完了する。
-- Smithery に API キー、`.env`、PostgreSQL 接続文字列が表示されない。
+- `400 No values to set` により Smithery MCPB 公開が保留中であると確認できる。
+- `smithery mcp publish` を再試行しない。
+- GitHub Releases の E2E-RELEASE-001 を正規の配布確認として実施する。

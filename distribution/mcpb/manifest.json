@@ -23,15 +23,7 @@
       "args": ["${__dirname}/server/launch.js"]
     }
   },
-  "tools": [
-    {"name": "run_benchmark", "description": "benchmarkを評価して保存する"},
-    {"name": "evaluate_agent", "description": "Agent評価の互換入口"},
-    {"name": "get_run", "description": "保存済みrunの詳細を取得する"},
-    {"name": "get_trace", "description": "runの時系列traceを取得する"},
-    {"name": "get_errors", "description": "runのエラーを取得する"},
-    {"name": "compare_runs", "description": "2 runのmetricsを比較する"},
-    {"name": "run_regression", "description": "最大10件を回帰評価する"}
-  ],
+  "tools_generated": true,
   "keywords": ["agent", "evaluation", "benchmark", "trace", "local"],
   "license": "MIT",
   "compatibility": {

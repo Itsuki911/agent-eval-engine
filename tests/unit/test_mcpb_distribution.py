@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from apps.mcp.server import create_server
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -17,7 +19,16 @@ def test_mcpb_manifest_declares_local_mcp_tools() -> None:
     assert manifest["server"]["type"] == "node"
     assert manifest["server"]["mcp_config"]["command"] == "node"
     assert manifest["compatibility"]["platforms"] == ["darwin", "win32", "linux"]
-    assert {tool["name"] for tool in manifest["tools"]} == {
+    assert manifest["tools_generated"] is True
+    assert "tools" not in manifest
+    print('{"test":"mcpb_manifest","tools":8,"runtime":"node"}')
+
+
+# 実行時のMCPツール公開を確認する
+def test_mcpb_runtime_exposes_eight_tools() -> None:
+    server = create_server()
+
+    assert set(server._tool_manager._tools) == {
         "run_benchmark",
         "evaluate_agent",
         "get_run",
@@ -25,8 +36,9 @@ def test_mcpb_manifest_declares_local_mcp_tools() -> None:
         "get_errors",
         "compare_runs",
         "run_regression",
+        "import_agent_trace",
     }
-    print('{"test":"mcpb_manifest","tools":7,"runtime":"node"}')
+    print('{"test":"mcpb_runtime_tools","tool_count":8}')
 
 
 # 起動処理の標準出力分離を確認する
@@ -53,5 +65,6 @@ def test_mcpb_build_script_rejects_environment_files() -> None:
     assert '$_.Name -eq ".env"' in script
     assert "Secret environment files cannot be included" in script
     assert "UTF8Encoding($false)" in script
+    assert '$NpxCommand = if ($env:OS -eq "Windows_NT")' in script
     assert "@anthropic-ai/mcpb pack" in script
     print('{"test":"mcpb_build_secret_guard","env_files":"rejected"}')

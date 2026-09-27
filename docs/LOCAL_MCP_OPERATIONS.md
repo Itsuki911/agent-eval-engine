@@ -20,7 +20,7 @@ docker compose --profile mcp ps
 MCP Host のツール一覧で、次の 7 件を確認します。
 
 ```text
-run_benchmark, evaluate_agent, get_run, get_trace, get_errors, compare_runs, run_regression
+run_benchmark, evaluate_agent, get_run, get_trace, get_errors, compare_runs, run_regression, import_agent_trace
 ```
 
 Host が接続できない場合は、次を確認します。
@@ -46,7 +46,7 @@ docker compose --profile mcp up -d --force-recreate mcp
 
 - `.env`、OpenRouter API キー、PostgreSQL 接続文字列を GitHub Release、Smithery、Issue、trace に掲載しない。
 - 初期値の dry-run を維持し、live 実行は利用者が料金と送信内容を理解した上で明示的に有効化する。
-- `run_benchmark` と `run_regression` は DB に書き込む。利用者が意図した benchmark だけ実行する。
+- `run_benchmark`、`run_regression`、`import_agent_trace` は DB に書き込む。利用者が意図した benchmark と記録だけ実行する。
 - MCP Host の実行承認画面では、ツール名と引数を確認する。
 - Docker Desktop と依存イメージを定期的に更新する。
 

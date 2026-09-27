@@ -1,0 +1,54 @@
+name: バグ報告 (Bug Report)
+description: 動作不良やエラーが発生した場合の報告フォーム
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Agent Eval Engine の不具合をご報告いただきありがとうございます。
+        ※ API キー、トークン、パスワード、秘密情報を含むログは絶対に貼り付けないでください。
+  - type: input
+    id: version
+    attributes:
+      label: agent-eval バージョン
+      description: agent-eval version の実行結果を入力してください。
+      placeholder: "例: 1.0.0 (commit: abc1234)"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: ご利用の OS
+      options:
+        - Windows 11 / 10 (amd64)
+        - Windows (arm64)
+        - macOS (Apple Silicon / arm64)
+        - macOS (Intel / amd64)
+        - Linux (x86_64)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 不具合の概要
+      description: 何が起きたのか、期待した動作と実際の動作を具体的に記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 再現手順
+      description: 不具合を再現するための実行コマンドや操作手順を記載してください。
+      placeholder: |
+        1. agent-eval init を実行
+        2. agent-eval run GEN-TOOL-001 を実行
+        3. エラーメッセージが表示される
+    validations:
+      required: true
+  - type: textarea
+    id: doctor_output
+    attributes:
+      label: agent-eval doctor の出力 (任意)
+      description: agent-eval doctor の実行結果を貼り付けてください（機密情報が含まれていないことを確認してください）。
+      render: shell

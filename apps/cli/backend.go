@@ -140,33 +140,68 @@ func newBackendClient() backendClient {
 // Python境界を実行してJSONを返す
 func (client backendClient) execute(ctx context.Context, args []string, onProgress func(backendProgress)) ([]byte, error) {
 	script := filepath.Join(client.root, "scripts", "tui_backend.py")
-	commandArgs := append([]string{script}, args...)
-	command := exec.CommandContext(ctx, client.python, commandArgs...)
-	command.Dir = client.root
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, err
+	_, statErr := os.Stat(script)
+	if statErr == nil {
+		commandArgs := append([]string{script}, args...)
+		command := exec.CommandContext(ctx, client.python, commandArgs...)
+		command.Dir = client.root
+
+		separator := string(os.PathListSeparator)
+		corePkg := filepath.Join(client.root, "packages", "core")
+		newPythonPath := client.root + separator + corePkg
+		if existing := os.Getenv("PYTHONPATH"); existing != "" {
+			newPythonPath = newPythonPath + separator + existing
+		}
+		command.Env = append(os.Environ(), "PYTHONPATH="+newPythonPath)
+
+		stdout, err := command.StdoutPipe()
+		if err == nil {
+			stderr, err := command.StderrPipe()
+			if err == nil {
+				if startErr := command.Start(); startErr == nil {
+					diagnostics := make(chan string, 1)
+					go scanProgress(stderr, onProgress, diagnostics)
+					output, readErr := io.ReadAll(stdout)
+					waitErr := command.Wait()
+					_ = <-diagnostics
+					if readErr == nil && waitErr == nil {
+						return output, nil
+					}
+				}
+			}
+		}
 	}
-	stderr, err := command.StderrPipe()
+
+	// Docker コンテナ経由で実行を試みる (一般利用者・非開発環境向け)
+	dockerArgs := []string{"compose", "--profile", "engine", "run", "--rm", "-T", "engine", "python", "scripts/tui_backend.py"}
+	dockerArgs = append(dockerArgs, args...)
+	dockerCmd := exec.CommandContext(ctx, "docker", dockerArgs...)
+	dockerCmd.Dir = client.root
+
+	stdout, err := dockerCmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("docker backend pipe failed: %w", err)
 	}
-	if err := command.Start(); err != nil {
-		return nil, err
+	stderr, err := dockerCmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("docker backend pipe failed: %w", err)
+	}
+	if err := dockerCmd.Start(); err != nil {
+		return nil, fmt.Errorf("backend execution failed (local and docker): %w", err)
 	}
 	diagnostics := make(chan string, 1)
 	go scanProgress(stderr, onProgress, diagnostics)
 	output, readErr := io.ReadAll(stdout)
-	waitErr := command.Wait()
+	waitErr := dockerCmd.Wait()
 	diagnostic := <-diagnostics
 	if readErr != nil {
 		return nil, readErr
 	}
 	if waitErr != nil {
 		if diagnostic != "" {
-			return nil, fmt.Errorf("python backend failed: %s", diagnostic)
+			return nil, fmt.Errorf("backend failed: %s", diagnostic)
 		}
-		return nil, fmt.Errorf("python backend failed: %w", waitErr)
+		return nil, fmt.Errorf("backend failed: %w", waitErr)
 	}
 	return output, nil
 }
@@ -182,6 +217,10 @@ func scanProgress(reader io.Reader, onProgress func(backendProgress), done chan<
 			if onProgress != nil {
 				onProgress(progress)
 			}
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Container ") || strings.HasPrefix(trimmed, "Network ") || strings.HasPrefix(trimmed, "[+]") {
 			continue
 		}
 		if len(diagnostics) < 3 {

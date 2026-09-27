@@ -152,7 +152,7 @@ func TestArrowKeysMoveTraceSelection(t *testing.T) {
 
 // ホーム画面で選択先を開く
 func TestHomeEnterOpensSelectedScreen(t *testing.T) {
-	state := appState{screen: homeScreen, homeIndex: 2}
+	state := appState{screen: homeScreen, homeIndex: 0}
 	state, done := nextState(state, "enter")
 	if done || state.screen != newEvalScreen {
 		t.Fatalf("expected new evaluation screen, got: %s", state.screen)
@@ -201,12 +201,14 @@ func TestHomeNumberKeysNavigateDirectly(t *testing.T) {
 		expectedScreen screenName
 		expectedIndex  int
 	}{
-		{"1", runsScreen, 0},
-		{"2", traceScreen, 1},
-		{"3", newEvalScreen, 2},
-		{"4", searchScreen, 3},
+		{"1", newEvalScreen, 0},
+		{"2", runsScreen, 1},
+		{"3", traceScreen, 2},
+		{"4", importTraceScreen, 3},
 		{"5", userBenchmarkScreen, 4},
-		{"6", helpScreen, 5},
+		{"6", mcpScreen, 5},
+		{"7", doctorScreen, 6},
+		{"8", helpScreen, 7},
 	}
 	for _, tc := range testCases {
 		state := appState{screen: homeScreen}

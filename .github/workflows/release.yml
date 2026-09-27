@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-binaries:
+    name: Build Multi-Platform CLI Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+
+      - name: 作業ディレクトリ準備
+        run: mkdir -p dist
+
+      - name: Windows amd64 ビルド
+        run: |
+          cd apps/cli
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.cliVersion=${{ github.ref_name }} -X main.cliGitCommit=${{ github.sha }}" -o ../../dist/agent-eval.exe .
+          cd ../../dist
+          zip agent-eval_windows_amd64.zip agent-eval.exe
+          rm agent-eval.exe
+
+      - name: Windows arm64 ビルド
+        run: |
+          cd apps/cli
+          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.cliVersion=${{ github.ref_name }} -X main.cliGitCommit=${{ github.sha }}" -o ../../dist/agent-eval.exe .
+          cd ../../dist
+          zip agent-eval_windows_arm64.zip agent-eval.exe
+          rm agent-eval.exe
+
+      - name: macOS amd64 ビルド
+        run: |
+          cd apps/cli
+          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.cliVersion=${{ github.ref_name }} -X main.cliGitCommit=${{ github.sha }}" -o ../../dist/agent-eval .
+          cd ../../dist
+          tar -czvf agent-eval_darwin_amd64.tar.gz agent-eval
+          rm agent-eval
+
+      - name: macOS arm64 ビルド
+        run: |
+          cd apps/cli
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.cliVersion=${{ github.ref_name }} -X main.cliGitCommit=${{ github.sha }}" -o ../../dist/agent-eval .
+          cd ../../dist
+          tar -czvf agent-eval_darwin_arm64.tar.gz agent-eval
+          rm agent-eval
+
+      - name: Linux amd64 ビルド
+        run: |
+          cd apps/cli
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.cliVersion=${{ github.ref_name }} -X main.cliGitCommit=${{ github.sha }}" -o ../../dist/agent-eval .
+          cd ../../dist
+          tar -czvf agent-eval_linux_amd64.tar.gz agent-eval
+          rm agent-eval
+
+      - name: Checksum 生成
+        run: |
+          cd dist
+          sha256sum agent-eval_* > checksums.txt
+
+      - name: SBOM 生成
+        run: |
+          cat << 'EOF' > dist/sbom.json
+          {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.5",
+            "version": 1,
+            "metadata": {
+              "component": {
+                "name": "agent-eval-engine",
+                "version": "${{ github.ref_name }}",
+                "type": "application"
+              }
+            }
+          }
+          EOF
+
+      - name: 成果物を一時保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binaries
+          path: dist/
+
+  build-mcpb:
+    name: Build MCPB Package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: MCPBを作成
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          powershell -ExecutionPolicy Bypass -File .\scripts\build_mcpb.ps1 -Version $version
+      - name: SHA-256を作成
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 .\dist\agent-eval-engine.mcpb).Hash.ToLower()
+          "$hash  agent-eval-engine.mcpb" | Set-Content -NoNewline .\dist\agent-eval-engine.mcpb.sha256
+      - name: MCPB成果物を保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mcpb
+          path: |
+            dist/agent-eval-engine.mcpb
+            dist/agent-eval-engine.mcpb.sha256
+
+  publish:
+    name: Publish GitHub Release
+    needs: [build-binaries, build-mcpb]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 全成果物をダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: GitHub Release 作成
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            release-assets/* \
+            --generate-notes \
+            --title "Agent Eval Engine ${{ github.ref_name }}"

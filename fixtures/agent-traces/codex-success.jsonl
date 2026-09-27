@@ -1,0 +1,5 @@
+{"record_type":"run","adapter_type":"codex","benchmark_id":"COD-PY-001","agent_name":"codex-cli","model":"openai/gpt-6-luna","agent_version":"0.1"}
+{"record_type":"event","sequence":0,"event_type":"user_prompt","actor":"user","payload":{"content":"Fix the condition."},"trace_id":"trace-codex-001","span_id":"span-001"}
+{"record_type":"event","sequence":1,"event_type":"tool_call","payload":{"tool":"read","path":"src/app.py"},"trace_id":"trace-codex-001","span_id":"span-002"}
+{"record_type":"event","sequence":2,"event_type":"tool_result","payload":{"tool":"read","result":"condition found"},"trace_id":"trace-codex-001","span_id":"span-002"}
+{"record_type":"result","status":"completed","task_success":true,"exit_code":0,"final_state":{"changed_files":["src/app.py"]}}

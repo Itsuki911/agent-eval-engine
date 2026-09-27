@@ -12,11 +12,24 @@ from sqlalchemy.orm import Session, selectinload
 from database.models import AgentTarget, Artifact, Evaluation, Event, Metric, Run, RunAgentExecution
 
 
+SENSITIVE_CONFIGURATION_KEYS = (
+    "api_key",
+    "access_key",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+    "credential",
+    "cookie",
+    "private_key",
+)
+
+
 # 秘密情報を含む設定を拒否する
 def reject_secret_configuration(value: Any) -> None:
     if isinstance(value, dict):
         for key, nested in value.items():
-            if any(word in key.casefold() for word in ("api_key", "token", "secret", "password")):
+            if any(word in key.casefold() for word in SENSITIVE_CONFIGURATION_KEYS):
                 raise ValueError("Agent接続先へ秘密情報を保存できません")
             reject_secret_configuration(nested)
     if isinstance(value, list):
@@ -72,6 +85,20 @@ class RunRepository:
         self.session.add(target)
         self.session.flush()
         return target
+
+    # Agent接続先を再利用して取得する
+    def get_or_create_agent_target(
+        self,
+        name: str,
+        adapter_type: str,
+        configuration: dict[str, Any] | None = None,
+        capabilities: dict[str, Any] | None = None,
+        version: str | None = None,
+    ) -> AgentTarget:
+        target = self.session.scalar(select(AgentTarget).where(AgentTarget.name == name))
+        if target is not None:
+            return target
+        return self.create_agent_target(name, adapter_type, configuration, capabilities, version)
 
     # Agent実行の開始情報を保存する
     def create_agent_execution(

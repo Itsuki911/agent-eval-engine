@@ -138,6 +138,10 @@ Windows 版 VS Code の MCP sandbox は現時点で利用できないため、�
 3. 返った `run_id` を `get_trace` に渡し、`benchmark_loaded` を含むイベントを確認する。
 4. live LLM を使う場合だけ、`engine.dry_run: false` と `AGENT_EVAL_MCP_ALLOW_LIVE=1` を両方設定して `mcp` を再作成する。
 
+## 実行記録を取り込む場合
+
+Codex、OpenCode、Antigravity などの実行記録は、`local-data/agent-traces/` に標準 JSONL として保存してから、MCP の `import_agent_trace` に相対ファイル名を渡す。形式と作成例は [Real Coding Agent Adapter](REAL_AGENT_ADAPTER.md) を参照する。MCP はこのフォルダ外・絶対パス・秘密情報を含む記録を拒否する。
+
 ## 接続解除
 
 Host 側の MCP 設定から `agent-eval` を削除または無効化し、次を実行します。

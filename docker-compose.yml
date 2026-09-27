@@ -84,6 +84,8 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_eval}:${POSTGRES_PASSWORD:-local-development-password}@db:5432/${POSTGRES_DB:-agent_eval}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-replace-with-your-openrouter-api-key}
       AGENT_EVAL_MCP_ALLOW_LIVE: ${AGENT_EVAL_MCP_ALLOW_LIVE:-0}
+      # 外部Agent記録の許可フォルダ
+      AGENT_EVAL_AGENT_TRACE_DIR: ${AGENT_EVAL_AGENT_TRACE_DIR:-/workspace/local-data/agent-traces}
       PYTHONPATH: /workspace:/workspace/packages/core
     depends_on:
       db:

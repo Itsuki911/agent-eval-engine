@@ -49,7 +49,7 @@ func TestMockupSelectionStaysWithinBounds(t *testing.T) {
 		lastIndex  func(appState) int
 	}{
 		{
-			"home", appState{screen: homeScreen}, appState{screen: homeScreen, homeIndex: 5},
+			"home", appState{screen: homeScreen}, appState{screen: homeScreen, homeIndex: 7},
 			func(state appState) int { return state.homeIndex }, func(state appState) int { return state.homeIndex },
 		},
 		{
@@ -106,7 +106,7 @@ func TestMockupQuitEndsInteraction(t *testing.T) {
 	var output bytes.Buffer
 	err := runInteractive(
 		appState{screen: homeScreen, noClear: true},
-		strings.NewReader("\x1b[B\x1b[B\rq"),
+		strings.NewReader("\rq"),
 		&output,
 	)
 	if err != nil {
